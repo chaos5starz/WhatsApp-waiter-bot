@@ -1,0 +1,19 @@
+{
+  "name": "whatsapp-waiter-bot",
+  "version": "1.0.0",
+  "description": "WhatsApp bot that collects order info from customers then hands off to a human for the same number",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "express-session": "^1.18.0",
+    "multer": "^1.4.5-lts.1",
+    "nodemailer": "^6.10.1",
+    "qrcode-terminal": "^0.12.0",
+    "socket.io": "^4.7.5",
+    "whatsapp-web.js": "^1.26.0"
+  }
+}

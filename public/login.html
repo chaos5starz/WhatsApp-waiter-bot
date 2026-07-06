@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Responder Login</title>
+<style>
+  body { font-family: Arial, sans-serif; background: #111b21; height: 100vh; margin: 0;
+         display: flex; align-items: center; justify-content: center; }
+  .box { background: #202c33; padding: 32px; border-radius: 8px; width: 280px; }
+  h2 { color: #e9edef; margin-top: 0; }
+  input { width: 100%; padding: 10px; margin-bottom: 12px; border-radius: 4px; border: none;
+          box-sizing: border-box; }
+  button { width: 100%; padding: 10px; background: #00a884; color: white; border: none;
+           border-radius: 4px; cursor: pointer; font-size: 15px; }
+  button:hover { background: #06976e; }
+  .error { color: #f15c6d; font-size: 14px; margin-bottom: 10px; min-height: 18px; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <h2>Responder Login</h2>
+    <div class="error" id="error"></div>
+    <input type="text" id="username" placeholder="Username" />
+    <input type="password" id="password" placeholder="Password" />
+    <button onclick="login()">Log In</button>
+  </div>
+
+<script>
+async function login() {
+  const username = document.getElementById('username').value;
+  const password = document.getElementById('password').value;
+  const res = await fetch('/api/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  });
+  if (res.ok) {
+    window.location.href = '/dashboard.html';
+  } else {
+    document.getElementById('error').textContent = 'Invalid username or password.';
+  }
+}
+</script>
+</body>
+</html>

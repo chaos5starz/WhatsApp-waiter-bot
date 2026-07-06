@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Responder Dashboard</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; margin: 0; height: 100vh; display: flex; background: #111b21; }
+
+  #sidebar { width: 300px; background: #202c33; overflow-y: auto; border-right: 1px solid #2a3942; }
+  #sidebar h3 { color: #e9edef; padding: 16px; margin: 0; border-bottom: 1px solid #2a3942; }
+  .pending-item { padding: 14px 16px; border-bottom: 1px solid #2a3942; cursor: pointer; color: #e9edef; }
+  .pending-item:hover { background: #2a3942; }
+  .pending-item.active { background: #2a3942; }
+  .pending-item .name { font-weight: bold; }
+  .pending-item .type { font-size: 13px; color: #8696a0; }
+
+  #main { flex: 1; display: flex; flex-direction: column; }
+  #chat-header { padding: 14px 20px; background: #202c33; color: #e9edef; border-bottom: 1px solid #2a3942; }
+  #resolve-btn { float: right; background: #00a884; border: none; color: white; padding: 6px 14px;
+                 border-radius: 4px; cursor: pointer; }
+
+  #messages { flex: 1; padding: 20px; overflow-y: auto; background: #0b141a; }
+  .msg { max-width: 60%; margin-bottom: 10px; padding: 8px 12px; border-radius: 8px; color: #e9edef;
+         clear: both; }
+  .msg.customer { background: #202c33; float: left; }
+  .msg.bot { background: #1f2c34; float: left; border-left: 3px solid #53bdeb; }
+  .msg.agent { background: #005c4b; float: right; }
+  .msg img { max-width: 100%; border-radius: 4px; margin-top: 6px; }
+  .msg a { color: #53bdeb; }
+  .msg .meta { font-size: 11px; color: #8696a0; margin-top: 4px; }
+
+  #composer { display: flex; padding: 12px; background: #202c33; gap: 8px; }
+  #text-input { flex: 1; padding: 10px; border-radius: 20px; border: none; }
+  #send-btn, #file-label { background: #00a884; color: white; border: none; padding: 10px 16px;
+                            border-radius: 20px; cursor: pointer; }
+  #file-input { display: none; }
+
+  #empty-state { flex: 1; display: flex; align-items: center; justify-content: center; color: #8696a0; }
+</style>
+</head>
+<body>
+  <div id="sidebar">
+    <h3>Pending Requests</h3>
+    <div id="pending-list"></div>
+  </div>
+
+  <div id="main">
+    <div id="empty-state">Select a chat from the left</div>
+  </div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+let currentChatId = null;
+const socket = io();
+
+async function checkAuthAndLoad() {
+  const res = await fetch('/api/pending');
+  if (res.status === 401) {
+    window.location.href = '/login.html';
+    return;
+  }
+  loadPending();
+}
+
+async function loadPending() {
+  const res = await fetch('/api/pending');
+  const pending = await res.json();
+  const list = document.getElementById('pending-list');
+  list.innerHTML = '';
+  pending.forEach((p) => {
+    const div = document.createElement('div');
+    div.className = 'pending-item' + (p.chatId === currentChatId ? ' active' : '');
+    div.innerHTML = `<div class="name">${p.data.name || 'Unknown'}</div>
+                      <div class="type">${p.data.inquiryType || ''}</div>`;
+    div.onclick = () => openChat(p.chatId, p.data);
+    list.appendChild(div);
+  });
+}
+
+function renderMessage(entry) {
+  const container = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'msg ' + entry.sender;
+
+  let content = '';
+  if (entry.type === 'image' && entry.mediaFile) {
+    content += `<img src="/media/${entry.mediaFile}" />`;
+  } else if (entry.type === 'document' && entry.mediaFile) {
+    content += `<a href="/media/${entry.mediaFile}" target="_blank">📄 Download file</a>`;
+  }
+  if (entry.text) content += `<div>${entry.text}</div>`;
+  content += `<div class="meta">${entry.sender} · ${new Date(entry.timestamp).toLocaleTimeString()}</div>`;
+
+  div.innerHTML = content;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+async function openChat(chatId, data) {
+  currentChatId = chatId;
+  loadPending(); // refresh sidebar to highlight active chat
+
+  document.getElementById('main').innerHTML = `
+    <div id="chat-header">
+      <button id="resolve-btn" onclick="resolveChat()">Mark Resolved</button>
+      <strong>${data.name || 'Unknown'}</strong> — ${data.inquiryType || ''}
+    </div>
+    <div id="messages"></div>
+    <div id="composer">
+      <label id="file-label" for="file-input">📎</label>
+      <input type="file" id="file-input" />
+      <input type="text" id="text-input" placeholder="Type a message..." />
+      <button id="send-btn" onclick="sendMessage()">Send</button>
+    </div>
+  `;
+
+  document.getElementById('text-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') sendMessage();
+  });
+
+  const res = await fetch(`/api/chat/${encodeURIComponent(chatId)}/messages`);
+  const messages = await res.json();
+  messages.forEach(renderMessage);
+
+  socket.emit('join_chat', chatId);
+}
+
+async function sendMessage() {
+  const textInput = document.getElementById('text-input');
+  const fileInput = document.getElementById('file-input');
+  const text = textInput.value.trim();
+  const file = fileInput.files[0];
+
+  if (!text && !file) return;
+
+  const formData = new FormData();
+  formData.append('text', text);
+  if (file) formData.append('file', file);
+
+  await fetch(`/api/chat/${encodeURIComponent(currentChatId)}/send`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  textInput.value = '';
+  fileInput.value = '';
+}
+
+async function resolveChat() {
+  await fetch(`/api/chat/${encodeURIComponent(currentChatId)}/resolve`, { method: 'POST' });
+  currentChatId = null;
+  document.getElementById('main').innerHTML = '<div id="empty-state">Select a chat from the left</div>';
+  loadPending();
+}
+
+socket.on('new_message', ({ chatId, entry }) => {
+  if (chatId === currentChatId) renderMessage(entry);
+});
+
+socket.on('pending_updated', loadPending);
+
+checkAuthAndLoad();
+setInterval(loadPending, 15000); // fallback refresh every 15s in case a socket event is missed
+</script>
+</body>
+</html>
