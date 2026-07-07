@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 const DATA_DIR = path.join(__dirname, 'data');
+
 const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
 const ORDERS_LOG_FILE = path.join(DATA_DIR, 'orders_log.json');
 const MESSAGES_FILE = path.join(DATA_DIR, 'messages.json');

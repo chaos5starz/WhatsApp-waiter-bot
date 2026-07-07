@@ -17,14 +17,7 @@ const path = require('path');
 const fs = require('fs');
 const { MessageMedia } = require('whatsapp-web.js');
 const { getMessages, appendMessage, MEDIA_DIR } = require('./store');
-
-// ---- Hardcoded responder logins - change these! ----
-// For a real production setup you'd hash these, but for two known internal
-// users this plain-text approach is a reasonable tradeoff for simplicity.
-const RESPONDERS = [
-  { username: 'A', password: 'wessam' },
-  { username: 'B', password: 'hadi' },
-];
+const RESPONDERS = require('./responders');
 
 const UPLOADS_DIR = path.join(__dirname, 'data', 'uploads_tmp');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -111,12 +104,15 @@ function startDashboard({ client, sessions, saveSessions, notifyClaimed, port })
         return res.status(400).json({ error: 'Nothing to send' });
       }
 
-      // First reply after handoff? Let both responders know it's claimed.
+      // First reply after handoff? Let the OTHER responder know it's
+      // claimed - we know who's replying because they're logged in
+      // (req.session.username), so we can exclude them from the email,
+      // unlike a manual WhatsApp reply where we can't tell A from B.
       const s = sessions[chatId];
       if (s && s.state === 'HANDED_OFF' && !s.claimedNotified) {
         s.claimedNotified = true;
         saveSessions(sessions);
-        await notifyClaimed();
+        await notifyClaimed({ name: s.data.name, respondedBy: req.session.username });
       }
 
       res.json({ ok: true });

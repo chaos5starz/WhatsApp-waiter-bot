@@ -19,6 +19,12 @@ const DASHBOARD_PORT = 3000;
 let sessions = loadSessions();
 let io = null; // set once the dashboard starts, used to push live updates
 
+// Tracks WhatsApp message IDs that WE (the bot) just sent, so the
+// message_create listener can tell "bot sent this" apart from "a human
+// typed this on the phone" - WhatsApp reports both as fromMe: true,
+// there's no other way to distinguish them.
+const pendingBotTexts = new Map();
+
 function now() {
   return Date.now();
 }
@@ -87,6 +93,8 @@ client.on('disconnected', (reason) => {
 // Sends a bot message AND logs/broadcasts it, so the dashboard's chat view
 // shows bot replies too, not just customer and agent messages.
 async function botSend(chatId, text) {
+  if (!pendingBotTexts.has(chatId)) pendingBotTexts.set(chatId, []);
+  pendingBotTexts.get(chatId).push(text); // recorded BEFORE sending, on purpose
   await client.sendMessage(chatId, text);
   logAndBroadcast(chatId, { sender: 'bot', type: 'text', text });
 }
@@ -226,6 +234,21 @@ client.on('message_create', async (message) => {
     const text = (message.body || '').trim();
 
     if (message.fromMe) {
+      // If this text matches something the bot just queued to send, treat
+      // it as the bot's own message, not a human agent replying. Matching
+      // on text (recorded before sending) instead of message ID (which
+      // only exists after sending) avoids a race condition where this
+      // listener can fire before the ID was ever recorded.
+      const pending = pendingBotTexts.get(chatId);
+      if (pending) {
+        const idx = pending.indexOf(text);
+        if (idx !== -1) {
+          pending.splice(idx, 1);
+          if (pending.length === 0) pendingBotTexts.delete(chatId);
+          return;
+        }
+      }
+
       const lower = text.toLowerCase();
 
       if (lower === '/done') {
@@ -243,14 +266,16 @@ client.on('message_create', async (message) => {
       }
 
       // A normal manual reply sent directly from WhatsApp (not the dashboard).
-      // Still log it and still trigger the "claimed" notification if relevant.
+      // NOTE: WhatsApp can't tell us which of A or B sent this - both would
+      // be replying from the same linked number - so we can't exclude
+      // either one here the way the dashboard can. We notify both.
       const session = sessions[chatId];
       if (session && session.state === 'HANDED_OFF') {
         logAndBroadcast(chatId, { sender: 'agent', type: 'text', text });
         if (!session.claimedNotified) {
           session.claimedNotified = true;
           saveSessions(sessions);
-          await notifyClaimed();
+          await notifyClaimed({ name: session.data.name, respondedBy: null });
         }
       }
       return;

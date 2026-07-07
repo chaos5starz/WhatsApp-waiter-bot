@@ -2,15 +2,11 @@
 // Sends email notifications to responders using Gmail SMTP.
 
 const nodemailer = require('nodemailer');
+const RESPONDERS = require('./responders');
 
 // ---- Config - replace these with real values ----
 const GMAIL_USER = 'shananwessam85@gmail.com';       // the Gmail account sending these emails
 const GMAIL_APP_PASSWORD = 'qeov cgew lzaj fosr';  // from Google Account > Security > App Passwords
-
-const RESPONDER_EMAILS = [
-  'shananwessam85@gmail.com',
-  'hady.shanan@gmail.com',
-];
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -20,15 +16,21 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-async function sendToResponders(subject, text) {
+// Generic sender - takes an explicit recipient list rather than always
+// emailing everyone, so different notifications can target different people.
+async function sendMail(recipients, subject, text) {
+  if (!recipients || recipients.length === 0) {
+    console.log('Skipped email (no recipients left to notify):', subject);
+    return;
+  }
   try {
     await transporter.sendMail({
       from: GMAIL_USER,
-      to: RESPONDER_EMAILS.join(','), // sends one email addressed to both
+      to: recipients.join(','),
       subject,
       text,
     });
-    console.log('Notification email sent:', subject);
+    console.log('Notification email sent:', subject, '->', recipients.join(','));
   } catch (err) {
     console.error('Failed to send notification email:', err);
   }
@@ -47,14 +49,27 @@ function notifyNewRequest(data) {
   if (data.dates) lines.push(`Dates: ${data.dates}`);
   lines.push('', 'Whoever is available, please reply on WhatsApp.');
 
-  return sendToResponders('🔔 New client waiting on WhatsApp', lines.join('\n'));
+  // A brand new handoff always goes to everyone - nobody's picked it up yet.
+  const recipients = RESPONDERS.map((r) => r.email);
+  return sendMail(recipients, '🔔 New client waiting on WhatsApp', lines.join('\n'));
 }
 
-function notifyClaimed() {
-  return sendToResponders(
-    '✅ Request already picked up',
-    'Someone has already started replying to this client on WhatsApp. No action needed unless you were already mid-reply.'
-  );
+// respondedBy: the username ('A' or 'B') of whoever replied, if known.
+//   - Known (dashboard reply): notify everyone EXCEPT that person.
+//   - Unknown (manual WhatsApp reply - we can't tell A from B there):
+//     notify everyone, since we don't know who to exclude.
+function notifyClaimed({ name, respondedBy }) {
+  const recipients = respondedBy
+    ? RESPONDERS.filter((r) => r.username !== respondedBy).map((r) => r.email)
+    : RESPONDERS.map((r) => r.email);
+
+  const clientName = name || 'a client';
+  const subject = `✅ Request for ${clientName} already picked up`;
+  const whoLine = respondedBy
+    ? `${respondedBy} has already started replying to ${clientName} on WhatsApp.`
+    : `Someone has already started replying to ${clientName} on WhatsApp.`;
+
+  return sendMail(recipients, subject, `${whoLine} No action needed unless you were already mid-reply.`);
 }
 
 module.exports = {
