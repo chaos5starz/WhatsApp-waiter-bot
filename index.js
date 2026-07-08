@@ -313,3 +313,42 @@ client.on('message_create', async (message) => {
 });
 
 client.initialize();
+
+// Handle Ctrl+C (and other termination signals) gracefully - close the
+// Puppeteer browser properly before exiting, so it doesn't leave a stale
+// lock file behind that causes the next `node index.js` to hang forever.
+// Handle Ctrl+C (and other termination signals) gracefully - close the
+// Puppeteer browser properly before exiting, so it doesn't leave a stale
+// lock file behind that causes the next `node index.js` to hang forever.
+async function shutdown() {
+  console.log('\nShutting down gracefully...');
+
+  // client.destroy() internally runs Windows' taskkill to force-close
+  // Chromium's child processes, and its output prints straight to this
+  // terminal - including harmless "already dead" messages when a process
+  // closed on its own first. We briefly silence stdout/stderr here just
+  // to hide that noise, then restore normal output right after.
+  const originalStdoutWrite = process.stdout.write.bind(process.stdout);
+  const originalStderrWrite = process.stderr.write.bind(process.stderr);
+  process.stdout.write = () => true;
+  process.stderr.write = () => true;
+
+  try {
+    await client.destroy();
+  } catch (err) {
+    // Restore output before logging, so this actually shows up.
+    process.stdout.write = originalStdoutWrite;
+    process.stderr.write = originalStderrWrite;
+    console.error('Error while shutting down:', err);
+    process.exit(1);
+    return;
+  }
+
+  process.stdout.write = originalStdoutWrite;
+  process.stderr.write = originalStderrWrite;
+  console.log('WhatsApp client closed cleanly.');
+  process.exit(0);
+}
+
+process.on('SIGINT', shutdown);  // Ctrl+C
+process.on('SIGTERM', shutdown); // e.g. if a process manager stops it later
