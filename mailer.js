@@ -4,9 +4,8 @@
 const nodemailer = require('nodemailer');
 const RESPONDERS = require('./responders');
 
-// ---- Config - replace these with real values ----
-const GMAIL_USER = 'shananwessam85@gmail.com';       // the Gmail account sending these emails
-const GMAIL_APP_PASSWORD = 'qeov cgew lzaj fosr';  // from Google Account > Security > App Passwords
+const GMAIL_USER = process.env.GMAIL_USER;
+const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',

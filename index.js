@@ -1,4 +1,6 @@
+require('dotenv').config();
 const { Client, LocalAuth } = require('whatsapp-web.js');
+
 const qrcode = require('qrcode-terminal');
 const fs = require('fs');
 const path = require('path');
@@ -7,6 +9,7 @@ const {
   saveSessions,
   appendCompletedOrder,
   appendMessage,
+  clearMessages,
   MEDIA_DIR,
 } = require('./store');
 const { notifyNewRequest, notifyClaimed } = require('./mailer');
@@ -35,6 +38,7 @@ function getSession(chatId) {
   if (!s || now() - (s.lastActivity || 0) > staleMs) {
     s = { state: 'IDLE', data: {}, lastActivity: now(), claimedNotified: false };
     sessions[chatId] = s;
+    clearMessages(chatId);
   }
   return s;
 }
@@ -251,16 +255,20 @@ client.on('message_create', async (message) => {
 
       const lower = text.toLowerCase();
 
-      if (lower === '/done') {
+      if (lower === '/done')
+      {
         sessions[chatId] = { state: 'IDLE', data: {}, lastActivity: now(), claimedNotified: false };
         saveSessions(sessions);
+        clearMessages(chatId);
         await client.sendMessage(chatId, 'Bot reset for this customer. It will greet them fresh next time.');
         if (io) io.emit('pending_updated');
         return;
       }
 
-      if (lower.startsWith('/as ')) {
+      if (lower.startsWith('/as '))
+      {
         const simulatedText = text.slice(4);
+        logAndBroadcast(chatId, { sender: 'customer', type: 'text', text: simulatedText });
         await handleCustomerMessage(chatId, simulatedText);
         return;
       }

@@ -4,6 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const DATA_DIR = path.join(__dirname, 'data');
 
@@ -70,15 +71,26 @@ function appendMessage(chatId, { sender, type, text, mediaFile }) {
   const all = loadAllMessages();
   if (!all[chatId]) all[chatId] = [];
   const entry = {
+    id: crypto.randomUUID(),
     sender,
     type: type || 'text',
     text: text || '',
-    mediaFile: mediaFile || null, // filename inside data/media, if any
+    mediaFile: mediaFile || null,
     timestamp: Date.now(),
   };
   all[chatId].push(entry);
   saveAllMessages(all);
   return entry;
+}
+
+// Wipes a chat's message history - called whenever that chat resets back
+// to IDLE (via /done, dashboard "Mark Resolved", or the 24h auto-timeout),
+// so the NEXT inquiry from this same customer starts with a clean dashboard
+// view instead of showing every past resolved conversation bundled in.
+function clearMessages(chatId) {
+  const all = loadAllMessages();
+  delete all[chatId];
+  saveAllMessages(all);
 }
 
 module.exports = {
@@ -87,5 +99,6 @@ module.exports = {
   appendCompletedOrder,
   getMessages,
   appendMessage,
+  clearMessages,
   MEDIA_DIR,
 };

@@ -51,8 +51,11 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
+
 let currentChatId = null;
+const renderedMessageIds = new Set();
 const socket = io();
+
 
 async function checkAuthAndLoad() {
   const res = await fetch('/api/pending');
@@ -79,6 +82,10 @@ async function loadPending() {
 }
 
 function renderMessage(entry) {
+   if (entry.id) {
+    if (renderedMessageIds.has(entry.id)) return;
+    renderedMessageIds.add(entry.id);
+  }
   const container = document.getElementById('messages');
   const div = document.createElement('div');
   div.className = 'msg ' + entry.sender;
@@ -98,6 +105,7 @@ function renderMessage(entry) {
 }
 
 async function openChat(chatId, data) {
+  renderedMessageIds.clear();
   currentChatId = chatId;
   loadPending(); // refresh sidebar to highlight active chat
 

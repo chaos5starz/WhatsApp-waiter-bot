@@ -1,1 +1,0 @@
-Fix race condition causing false "already picked up" emails; add per-responder notification targeting

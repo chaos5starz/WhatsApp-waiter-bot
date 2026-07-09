@@ -16,8 +16,13 @@ const { Server } = require('socket.io');
 const path = require('path');
 const fs = require('fs');
 const { MessageMedia } = require('whatsapp-web.js');
-const { getMessages, appendMessage, MEDIA_DIR } = require('./store');
+const { getMessages, appendMessage, clearMessages, MEDIA_DIR } = require('./store');
 const RESPONDERS = require('./responders');
+
+const SESSION_SECRET = process.env.SESSION_SECRET;
+if (!SESSION_SECRET) {
+  throw new Error('SESSION_SECRET is not set. Add it to your .env file before starting the server.');
+}
 
 const UPLOADS_DIR = path.join(__dirname, 'data', 'uploads_tmp');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -29,14 +34,20 @@ function startDashboard({ client, sessions, saveSessions, notifyClaimed, port })
   const server = http.createServer(app);
   const io = new Server(server);
 
+  // Created ONCE and reused for both Express and Socket.io below, so both
+  // read/write the same in-memory session store. Previously, Socket.io was
+  // given a brand new session() middleware (a brand new, empty store) on
+  // every connection, so it could never see sessions created by HTTP login
+  // - sockets always failed their loggedIn check and silently disconnected,
+  // which is why live updates never worked without a manual page refresh.
+  const sessionMiddleware = session({
+    secret: SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+  });
+
   app.use(express.json());
-  app.use(
-    session({
-      secret: 'change-this-to-a-random-string',
-      resave: false,
-      saveUninitialized: false,
-    })
-  );
+  app.use(sessionMiddleware);
 
   // ---- Auth ----
   function requireLogin(req, res, next) {
@@ -127,6 +138,7 @@ function startDashboard({ client, sessions, saveSessions, notifyClaimed, port })
     const chatId = req.params.chatId;
     sessions[chatId] = { state: 'IDLE', data: {}, lastActivity: Date.now(), claimedNotified: false };
     saveSessions(sessions);
+    clearMessages(chatId); // fresh transcript for this chat's next inquiry
     io.emit('pending_updated');
     res.json({ ok: true });
   });
@@ -143,12 +155,7 @@ function startDashboard({ client, sessions, saveSessions, notifyClaimed, port })
 
   // ---- Socket.io: let dashboard clients "join" a specific chat's room ----
   io.use((socket, next) => {
-    // Share the express-session with socket.io connections.
-    session({ secret: 'change-this-to-a-random-string', resave: false, saveUninitialized: false })(
-      socket.request,
-      {},
-      next
-    );
+    sessionMiddleware(socket.request, {}, next);
   });
 
   io.on('connection', (socket) => {
