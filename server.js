@@ -34,6 +34,10 @@ function startDashboard({ client, sessions, saveSessions, notifyClaimed, registe
   const server = http.createServer(app);
   const io = new Server(server);
 
+  // Created ONCE and reused for both Express and Socket.io below, so both
+  // read/write the same in-memory session store. A separate session()
+  // instance per socket connection would have its own empty store and
+  // never see sessions created by HTTP login.
   const sessionMiddleware = session({
     secret: SESSION_SECRET,
     resave: false,
@@ -92,18 +96,35 @@ function startDashboard({ client, sessions, saveSessions, notifyClaimed, registe
 
     try {
       if (req.file) {
+        // Register BEFORE sendMessage - message_create can fire before the
+        // sendMessage() promise resolves, so this must happen first or the
+        // message_create listener in index.js won't recognize it in time
+        // and will log it a second time as a "manual WhatsApp reply".
         registerPendingText(chatId, text);
 
-        const media = MessageMedia.fromFilePath(req.file.path);
+        // Build MessageMedia manually from the file's bytes + multer's own
+        // detected mimetype/filename, instead of MessageMedia.fromFilePath(),
+        // which guesses the mimetype from the file's EXTENSION on disk.
+        // Multer's default storage saves uploads under a random hash
+        // filename with no extension, so fromFilePath() couldn't detect a
+        // type at all - it sent media with mimetype: null, which is why
+        // WhatsApp showed every file as an unopenable "Untitled" doc.
+        const fileBuffer = fs.readFileSync(req.file.path);
+        const media = new MessageMedia(
+          req.file.mimetype,
+          fileBuffer.toString('base64'),
+          req.file.originalname
+        );
         await client.sendMessage(chatId, media, { caption: text || undefined });
 
+        // Keep a permanent copy in data/media so the dashboard can show it later.
         const permanentName = `${Date.now()}-${req.file.originalname}`;
         fs.copyFileSync(req.file.path, path.join(MEDIA_DIR, permanentName));
-        fs.unlinkSync(req.file.path);
+        fs.unlinkSync(req.file.path); // remove the temp upload copy
 
         const entry = appendMessage(chatId, {
           sender: 'agent',
-          type: media.mimetype.startsWith('image/') ? 'image' : 'document',
+          type: req.file.mimetype.startsWith('image/') ? 'image' : 'document',
           text,
           mediaFile: permanentName,
         });
@@ -117,6 +138,10 @@ function startDashboard({ client, sessions, saveSessions, notifyClaimed, registe
         return res.status(400).json({ error: 'Nothing to send' });
       }
 
+      // First reply after handoff? Let the OTHER responder know it's
+      // claimed - we know who's replying because they're logged in
+      // (req.session.username), so we can exclude them from the email,
+      // unlike a manual WhatsApp reply where we can't tell A from B.
       const s = sessions[chatId];
       if (s && s.state === 'HANDED_OFF' && !s.claimedNotified) {
         s.claimedNotified = true;
@@ -136,7 +161,7 @@ function startDashboard({ client, sessions, saveSessions, notifyClaimed, registe
     const chatId = req.params.chatId;
     sessions[chatId] = { state: 'IDLE', data: {}, lastActivity: Date.now(), claimedNotified: false };
     saveSessions(sessions);
-    clearMessages(chatId);
+    clearMessages(chatId); // fresh transcript for this chat's next inquiry
     io.emit('pending_updated');
     res.json({ ok: true });
   });
