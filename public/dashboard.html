@@ -56,6 +56,16 @@ let currentChatId = null;
 const renderedMessageIds = new Set();
 const socket = io();
 
+// Escapes HTML-significant characters so customer-typed text (name, inquiry
+// details, chat messages) can never be interpreted as markup by the browser
+// when interpolated into innerHTML templates below. Uses the browser's own
+// textContent -> innerHTML round-trip rather than a manual regex, so it
+// stays correct even for edge cases (quotes, ampersands, etc.).
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str == null ? '' : String(str);
+  return div.innerHTML;
+}
 
 async function checkAuthAndLoad() {
   const res = await fetch('/api/pending');
@@ -74,8 +84,8 @@ async function loadPending() {
   pending.forEach((p) => {
     const div = document.createElement('div');
     div.className = 'pending-item' + (p.chatId === currentChatId ? ' active' : '');
-    div.innerHTML = `<div class="name">${p.data.name || 'Unknown'}</div>
-                      <div class="type">${p.data.inquiryType || ''}</div>`;
+    div.innerHTML = `<div class="name">${escapeHtml(p.data.name) || 'Unknown'}</div>
+                      <div class="type">${escapeHtml(p.data.inquiryType)}</div>`;
     div.onclick = () => openChat(p.chatId, p.data);
     list.appendChild(div);
   });
@@ -96,7 +106,7 @@ function renderMessage(entry) {
   } else if (entry.type === 'document' && entry.mediaFile) {
     content += `<a href="/media/${entry.mediaFile}" target="_blank">📄 Download file</a>`;
   }
-  if (entry.text) content += `<div>${entry.text}</div>`;
+  if (entry.text) content += `<div>${escapeHtml(entry.text)}</div>`;
   content += `<div class="meta">${entry.sender} · ${new Date(entry.timestamp).toLocaleTimeString()}</div>`;
 
   div.innerHTML = content;
@@ -112,7 +122,7 @@ async function openChat(chatId, data) {
   document.getElementById('main').innerHTML = `
     <div id="chat-header">
       <button id="resolve-btn" onclick="resolveChat()">Mark Resolved</button>
-      <strong>${data.name || 'Unknown'}</strong> — ${data.inquiryType || ''}
+      <strong>${escapeHtml(data.name) || 'Unknown'}</strong> — ${escapeHtml(data.inquiryType)}
     </div>
     <div id="messages"></div>
     <div id="composer">

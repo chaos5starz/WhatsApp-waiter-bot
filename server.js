@@ -27,7 +27,26 @@ if (!SESSION_SECRET) {
 const UPLOADS_DIR = path.join(__dirname, 'data', 'uploads_tmp');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
-const upload = multer({ dest: UPLOADS_DIR });
+// 15MB comfortably covers boarding passes, ID scans, and phone-camera
+// photos (usually 3-8MB) while blocking anything unreasonably large that
+// could fill up disk on a low-cost VPS.
+const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
+const upload = multer({ dest: UPLOADS_DIR, limits: { fileSize: MAX_UPLOAD_BYTES } });
+
+// Resolves `filename` against MEDIA_DIR and rejects anything that would
+// escape it (e.g. "../../.env" or an absolute path). path.basename() strips
+// directory components first; the resolve+startsWith check is a second
+// layer in case of edge cases basename() alone doesn't catch on some OSes.
+// Returns null if the filename is unsafe, otherwise the safe absolute path.
+function safeMediaPath(filename) {
+  const base = path.basename(filename);
+  const resolvedMediaDir = path.resolve(MEDIA_DIR);
+  const resolved = path.resolve(resolvedMediaDir, base);
+  if (!resolved.startsWith(resolvedMediaDir + path.sep)) {
+    return null;
+  }
+  return resolved;
+}
 
 function startDashboard({ client, sessions, saveSessions, notifyClaimed, registerPendingText, resetChatWithFarewell, port }) {
   const app = express();
@@ -117,8 +136,14 @@ function startDashboard({ client, sessions, saveSessions, notifyClaimed, registe
         );
         await client.sendMessage(chatId, media, { caption: text || undefined });
 
-        // Keep a permanent copy in data/media so the dashboard can show it later.
-        const permanentName = `${Date.now()}-${req.file.originalname}`;
+        // Keep a permanent copy in data/media so the dashboard can show it
+        // later. originalname is the filename the BROWSER reported at
+        // upload time - fully attacker-controlled - so it's stripped down
+        // to just its basename before being used to build a path, to
+        // prevent a crafted name like "../../server.js" from writing
+        // outside MEDIA_DIR.
+        const safeOriginalName = path.basename(req.file.originalname);
+        const permanentName = `${Date.now()}-${safeOriginalName}`;
         fs.copyFileSync(req.file.path, path.join(MEDIA_DIR, permanentName));
         fs.unlinkSync(req.file.path); // remove the temp upload copy
 
@@ -168,8 +193,8 @@ function startDashboard({ client, sessions, saveSessions, notifyClaimed, registe
 
   // ---- Serve uploaded/received media files (auth-protected) ----
   app.get('/media/:filename', requireLogin, (req, res) => {
-    const filePath = path.join(MEDIA_DIR, req.params.filename);
-    if (!fs.existsSync(filePath)) return res.status(404).end();
+    const filePath = safeMediaPath(req.params.filename);
+    if (!filePath || !fs.existsSync(filePath)) return res.status(404).end();
     res.sendFile(filePath);
   });
 
@@ -189,6 +214,19 @@ function startDashboard({ client, sessions, saveSessions, notifyClaimed, registe
     socket.on('join_chat', (chatId) => {
       socket.join(`chat:${chatId}`);
     });
+  });
+
+  // Catches errors thrown by middleware (like multer's file-size limit)
+  // that happen before a route handler's own try/catch can run. Must be
+  // defined with 4 arguments (err, req, res, next) - that's how Express
+  // identifies it as an error handler rather than a normal middleware.
+  // Placed after all routes so it only catches what nothing else handled.
+  app.use((err, req, res, next) => {
+    if (err && err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ error: 'File too large (max 15MB).' });
+    }
+    console.error('Unhandled dashboard error:', err);
+    res.status(500).json({ error: 'Something went wrong.' });
   });
 
   server.listen(port, () => {
