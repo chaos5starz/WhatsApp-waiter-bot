@@ -19,13 +19,19 @@ const RESET_AFTER_HOURS = 24;
 const COMPANY_NAME = 'Alforkan Tours';
 const DASHBOARD_PORT = 3000;
 
+// The message sent to the customer whenever a chat is reset via /done
+// (whether typed directly in WhatsApp or triggered from the dashboard).
+// Change the wording here and it updates in both places automatically.
+const FAREWELL_MESSAGE = `Thank you for contacting ${COMPANY_NAME}! If you need anything else, feel free to reach out anytime. Have a great day! 😊`;
+
 let sessions = loadSessions();
 let io = null; // set once the dashboard starts, used to push live updates
 
-// Tracks WhatsApp message IDs that WE (the bot) just sent, so the
-// message_create listener can tell "bot sent this" apart from "a human
-// typed this on the phone" - WhatsApp reports both as fromMe: true,
-// there's no other way to distinguish them.
+// Tracks WhatsApp message text that WE (the bot, OR the dashboard on behalf
+// of a human agent) just sent, so the message_create listener can tell
+// "we already logged this" apart from "a human typed this on the phone
+// directly" - WhatsApp reports both as fromMe: true, there's no other way
+// to distinguish them.
 const pendingBotTexts = new Map();
 
 function now() {
@@ -62,6 +68,17 @@ function logAndBroadcast(chatId, entryFields) {
   return entry;
 }
 
+// Records that a fromMe message with this exact text is about to be sent
+// through the bot's WhatsApp session (either an automated bot reply via
+// botSend, or a dashboard agent reply via server.js) and has ALREADY been
+// logged by whoever is sending it. Must be called BEFORE client.sendMessage()
+// - message_create can fire before the sendMessage() promise resolves, so
+// registering "after" would race and miss it.
+function registerPendingText(chatId, text) {
+  if (!pendingBotTexts.has(chatId)) pendingBotTexts.set(chatId, []);
+  pendingBotTexts.get(chatId).push(text);
+}
+
 const client = new Client({
   authStrategy: new LocalAuth(),
   puppeteer: {
@@ -82,6 +99,8 @@ client.on('ready', () => {
     sessions,
     saveSessions,
     notifyClaimed,
+    registerPendingText,
+    resetChatWithFarewell,
     port: DASHBOARD_PORT,
   });
 });
@@ -97,10 +116,22 @@ client.on('disconnected', (reason) => {
 // Sends a bot message AND logs/broadcasts it, so the dashboard's chat view
 // shows bot replies too, not just customer and agent messages.
 async function botSend(chatId, text) {
-  if (!pendingBotTexts.has(chatId)) pendingBotTexts.set(chatId, []);
-  pendingBotTexts.get(chatId).push(text); // recorded BEFORE sending, on purpose
+  registerPendingText(chatId, text); // recorded BEFORE sending, on purpose
   await client.sendMessage(chatId, text);
   logAndBroadcast(chatId, { sender: 'bot', type: 'text', text });
+}
+
+// Resets a chat back to IDLE and sends the customer a friendly closing
+// message instead of a raw "bot reset" system message. Shared by both the
+// /done command (typed directly in WhatsApp) and the dashboard's /done
+// shortcut, so the reset logic and wording only need to exist in one place.
+async function resetChatWithFarewell(chatId) {
+  sessions[chatId] = { state: 'IDLE', data: {}, lastActivity: now(), claimedNotified: false };
+  saveSessions(sessions);
+  clearMessages(chatId);
+  registerPendingText(chatId, FAREWELL_MESSAGE);
+  await client.sendMessage(chatId, FAREWELL_MESSAGE);
+  if (io) io.emit('pending_updated');
 }
 
 async function handleCustomerMessage(chatId, text) {
@@ -238,11 +269,9 @@ client.on('message_create', async (message) => {
     const text = (message.body || '').trim();
 
     if (message.fromMe) {
-      // If this text matches something the bot just queued to send, treat
-      // it as the bot's own message, not a human agent replying. Matching
-      // on text (recorded before sending) instead of message ID (which
-      // only exists after sending) avoids a race condition where this
-      // listener can fire before the ID was ever recorded.
+      // If this text matches something the bot OR the dashboard just
+      // queued to send, it's already been logged by whoever sent it -
+      // don't log it again as a "manual reply typed on the phone".
       const pending = pendingBotTexts.get(chatId);
       if (pending) {
         const idx = pending.indexOf(text);
@@ -257,11 +286,14 @@ client.on('message_create', async (message) => {
 
       if (lower === '/done')
       {
-        sessions[chatId] = { state: 'IDLE', data: {}, lastActivity: now(), claimedNotified: false };
-        saveSessions(sessions);
-        clearMessages(chatId);
-        await client.sendMessage(chatId, 'Bot reset for this customer. It will greet them fresh next time.');
-        if (io) io.emit('pending_updated');
+        // Delete the "/done" command itself from the real chat so the
+        // customer never sees it - only the friendly farewell that follows.
+        try {
+          await message.delete(true);
+        } catch (delErr) {
+          console.error('Could not delete /done message (may be outside WhatsApp\'s delete window):', delErr);
+        }
+        await resetChatWithFarewell(chatId);
         return;
       }
 
@@ -325,17 +357,9 @@ client.initialize();
 // Handle Ctrl+C (and other termination signals) gracefully - close the
 // Puppeteer browser properly before exiting, so it doesn't leave a stale
 // lock file behind that causes the next `node index.js` to hang forever.
-// Handle Ctrl+C (and other termination signals) gracefully - close the
-// Puppeteer browser properly before exiting, so it doesn't leave a stale
-// lock file behind that causes the next `node index.js` to hang forever.
 async function shutdown() {
   console.log('\nShutting down gracefully...');
 
-  // client.destroy() internally runs Windows' taskkill to force-close
-  // Chromium's child processes, and its output prints straight to this
-  // terminal - including harmless "already dead" messages when a process
-  // closed on its own first. We briefly silence stdout/stderr here just
-  // to hide that noise, then restore normal output right after.
   const originalStdoutWrite = process.stdout.write.bind(process.stdout);
   const originalStderrWrite = process.stderr.write.bind(process.stderr);
   process.stdout.write = () => true;
@@ -344,7 +368,6 @@ async function shutdown() {
   try {
     await client.destroy();
   } catch (err) {
-    // Restore output before logging, so this actually shows up.
     process.stdout.write = originalStdoutWrite;
     process.stderr.write = originalStderrWrite;
     console.error('Error while shutting down:', err);

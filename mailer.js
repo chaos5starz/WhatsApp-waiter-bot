@@ -48,8 +48,11 @@ function notifyNewRequest(data) {
   if (data.dates) lines.push(`Dates: ${data.dates}`);
   lines.push('', 'Whoever is available, please reply on WhatsApp.');
 
-  // A brand new handoff always goes to everyone - nobody's picked it up yet.
-  const recipients = RESPONDERS.map((r) => r.email);
+  // A brand new handoff always goes to everyone with a real email on file -
+  // nobody's picked it up yet. Filter out responders with no email set
+  // (e.g. RESPONDER_B_EMAIL left blank in .env) before building the list,
+  // otherwise a single missing address breaks the entire send.
+  const recipients = RESPONDERS.filter((r) => r.email).map((r) => r.email);
   return sendMail(recipients, '🔔 New client waiting on WhatsApp', lines.join('\n'));
 }
 
@@ -58,9 +61,9 @@ function notifyNewRequest(data) {
 //   - Unknown (manual WhatsApp reply - we can't tell A from B there):
 //     notify everyone, since we don't know who to exclude.
 function notifyClaimed({ name, respondedBy }) {
-  const recipients = respondedBy
-    ? RESPONDERS.filter((r) => r.username !== respondedBy).map((r) => r.email)
-    : RESPONDERS.map((r) => r.email);
+    const recipients = respondedBy
+    ? RESPONDERS.filter((r) => r.username !== respondedBy && r.email).map((r) => r.email)
+    : RESPONDERS.filter((r) => r.email).map((r) => r.email);
 
   const clientName = name || 'a client';
   const subject = `✅ Request for ${clientName} already picked up`;

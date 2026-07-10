@@ -29,17 +29,11 @@ if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 const upload = multer({ dest: UPLOADS_DIR });
 
-function startDashboard({ client, sessions, saveSessions, notifyClaimed, port }) {
+function startDashboard({ client, sessions, saveSessions, notifyClaimed, registerPendingText, resetChatWithFarewell, port }) {
   const app = express();
   const server = http.createServer(app);
   const io = new Server(server);
 
-  // Created ONCE and reused for both Express and Socket.io below, so both
-  // read/write the same in-memory session store. Previously, Socket.io was
-  // given a brand new session() middleware (a brand new, empty store) on
-  // every connection, so it could never see sessions created by HTTP login
-  // - sockets always failed their loggedIn check and silently disconnected,
-  // which is why live updates never worked without a manual page refresh.
   const sessionMiddleware = session({
     secret: SESSION_SECRET,
     resave: false,
@@ -88,17 +82,24 @@ function startDashboard({ client, sessions, saveSessions, notifyClaimed, port })
     const chatId = req.params.chatId;
     const text = (req.body.text || '').trim();
 
+    // Special case: typing /done in the dashboard composer triggers the
+    // same "reset + friendly farewell" flow as typing /done directly in
+    // WhatsApp - it must NOT be forwarded to the customer as literal text.
+    if (text.toLowerCase() === '/done' && !req.file) {
+      await resetChatWithFarewell(chatId);
+      return res.json({ ok: true });
+    }
+
     try {
       if (req.file) {
-        // A file/image was attached - send it as WhatsApp media, with the
-        // text (if any) as its caption.
+        registerPendingText(chatId, text);
+
         const media = MessageMedia.fromFilePath(req.file.path);
         await client.sendMessage(chatId, media, { caption: text || undefined });
 
-        // Keep a permanent copy in data/media so the dashboard can show it later.
         const permanentName = `${Date.now()}-${req.file.originalname}`;
         fs.copyFileSync(req.file.path, path.join(MEDIA_DIR, permanentName));
-        fs.unlinkSync(req.file.path); // remove the temp upload copy
+        fs.unlinkSync(req.file.path);
 
         const entry = appendMessage(chatId, {
           sender: 'agent',
@@ -108,6 +109,7 @@ function startDashboard({ client, sessions, saveSessions, notifyClaimed, port })
         });
         io.to(`chat:${chatId}`).emit('new_message', { chatId, entry });
       } else if (text) {
+        registerPendingText(chatId, text);
         await client.sendMessage(chatId, text);
         const entry = appendMessage(chatId, { sender: 'agent', type: 'text', text });
         io.to(`chat:${chatId}`).emit('new_message', { chatId, entry });
@@ -115,10 +117,6 @@ function startDashboard({ client, sessions, saveSessions, notifyClaimed, port })
         return res.status(400).json({ error: 'Nothing to send' });
       }
 
-      // First reply after handoff? Let the OTHER responder know it's
-      // claimed - we know who's replying because they're logged in
-      // (req.session.username), so we can exclude them from the email,
-      // unlike a manual WhatsApp reply where we can't tell A from B.
       const s = sessions[chatId];
       if (s && s.state === 'HANDED_OFF' && !s.claimedNotified) {
         s.claimedNotified = true;
@@ -138,7 +136,7 @@ function startDashboard({ client, sessions, saveSessions, notifyClaimed, port })
     const chatId = req.params.chatId;
     sessions[chatId] = { state: 'IDLE', data: {}, lastActivity: Date.now(), claimedNotified: false };
     saveSessions(sessions);
-    clearMessages(chatId); // fresh transcript for this chat's next inquiry
+    clearMessages(chatId);
     io.emit('pending_updated');
     res.json({ ok: true });
   });
