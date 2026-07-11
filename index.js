@@ -154,6 +154,14 @@ client.on('qr', (qr) => {
   qrcode.generate(qr, { small: true });
 });
 
+client.on('loading_screen', (percent, message) => {
+  console.log(`Loading WhatsApp Web: ${percent}% - ${message}`);
+});
+
+client.on('authenticated', () => {
+  console.log('WhatsApp authenticated, finishing startup...');
+});
+
 client.on('ready', () => {
   console.log('WhatsApp bot is ready and connected.');
   io = startDashboard({
@@ -389,6 +397,13 @@ async function handleCustomerMessage(chatId, text) {
     }
 
     default: {
+      // Reaching here means session.state holds a value the current code
+      // doesn't recognize - almost always leftover state from an older
+      // version of the flow (e.g. a state name that no longer exists after
+      // a redesign). Logging this loudly is what would have caught the
+      // "/as looks like it's doing nothing" confusion immediately instead
+      // of silently resetting with no explanation.
+      console.warn(`Unrecognized session state "${session.state}" for chat ${chatId} - resetting to IDLE.`);
       setState(chatId, 'IDLE');
       break;
     }
@@ -488,6 +503,27 @@ client.on('message_create', async (message) => {
     console.error('Error handling message:', err);
   }
 });
+
+console.log('Launching WhatsApp client (this can take a while on first run, or if Chromium is being scanned by antivirus)...');
+
+// If nothing has printed after this for 60s, it's very likely stuck on
+// Puppeteer/Chromium launching (antivirus scan, a stale lock file from an
+// earlier unclean shutdown, or a corrupted Chromium install) rather than
+// anything in our own code - this warning exists so a silent hang is
+// diagnosable instead of looking identical to "still starting normally."
+const startupStallWarning = setTimeout(() => {
+  console.warn(
+    '\n⚠️  Still not connected after 60s. If no QR code or "authenticated" ' +
+    'message has printed above, this is very likely a Puppeteer/Chromium ' +
+    'launch issue, not a bug in the bot itself. Try:\n' +
+    '  1) taskkill //F //IM chrome.exe //T\n' +
+    '  2) find .wwebjs_auth -name "SingletonLock" -delete\n' +
+    '  3) Add a Windows Defender exclusion for this project folder\n' +
+    '  4) Re-run npm start\n'
+  );
+}, 60000);
+
+client.on('ready', () => clearTimeout(startupStallWarning));
 
 client.initialize();
 

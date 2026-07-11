@@ -156,10 +156,23 @@ async function sendMessage() {
   formData.append('text', text);
   if (file) formData.append('file', file);
 
-  await fetch(`/api/chat/${encodeURIComponent(currentChatId)}/send`, {
+  const res = await fetch(`/api/chat/${encodeURIComponent(currentChatId)}/send`, {
     method: 'POST',
     body: formData,
   });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    alert(body.error || 'Failed to send message.');
+    if (res.status === 409) {
+      // Chat is no longer active (auto-reset, resolved elsewhere, etc.) -
+      // bail out of this chat view instead of leaving a dead composer open.
+      currentChatId = null;
+      document.getElementById('main').innerHTML = '<div id="empty-state">Select a chat from the left</div>';
+      loadPending();
+    }
+    return;
+  }
 
   textInput.value = '';
   fileInput.value = '';

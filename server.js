@@ -105,6 +105,23 @@ function startDashboard({ client, sessions, saveSessions, notifyClaimed, registe
     const chatId = req.params.chatId;
     const text = (req.body.text || '').trim();
 
+    // Guard against sending into a chat that's no longer handed off - it
+    // may have auto-reset after 24h of inactivity, been resolved from
+    // another tab/device, or (rarest) already started a brand new inquiry.
+    // Without this check, a responder who still has an old thread open
+    // could send a reply that goes nowhere useful, or worse, interrupts a
+    // customer's fresh conversation. Checked before ANY send path below,
+    // including the /done shortcut.
+    const currentSession = sessions[chatId];
+    if (!currentSession || currentSession.state !== 'HANDED_OFF') {
+      if (req.file) {
+        fs.unlink(req.file.path, () => {}); // clean up the temp upload; ignore errors
+      }
+      return res.status(409).json({
+        error: 'This chat is no longer active (it may have been resolved or reset). Please refresh.',
+      });
+    }
+
     // Special case: typing /done in the dashboard composer triggers the
     // same "reset + friendly farewell" flow as typing /done directly in
     // WhatsApp - it must NOT be forwarded to the customer as literal text.
@@ -182,12 +199,13 @@ function startDashboard({ client, sessions, saveSessions, notifyClaimed, registe
   });
 
   // ---- Mark a chat resolved (equivalent to the /done WhatsApp command) ----
-  app.post('/api/chat/:chatId/resolve', requireLogin, (req, res) => {
+  // Reuses resetChatWithFarewell() (the same function the /done command and
+  // its dashboard shortcut use) so this button sends the exact same
+  // friendly closing message instead of resetting silently. This also
+  // means the wording only ever needs to be edited in one place.
+  app.post('/api/chat/:chatId/resolve', requireLogin, async (req, res) => {
     const chatId = req.params.chatId;
-    sessions[chatId] = { state: 'IDLE', data: {}, lastActivity: Date.now(), claimedNotified: false };
-    saveSessions(sessions);
-    clearMessages(chatId); // fresh transcript for this chat's next inquiry
-    io.emit('pending_updated');
+    await resetChatWithFarewell(chatId);
     res.json({ ok: true });
   });
 
