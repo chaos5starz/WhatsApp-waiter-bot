@@ -14,15 +14,12 @@ const {
 } = require('./store');
 const { notifyNewRequest, notifyClaimed } = require('./mailer');
 const { startDashboard } = require('./server');
+const translations = require('./translations');
+const flows = require('./flows');
 
 const RESET_AFTER_HOURS = 24;
 const COMPANY_NAME = 'Alforkan Tours';
 const DASHBOARD_PORT = 3000;
-
-// The message sent to the customer whenever a chat is reset via /done
-// (whether typed directly in WhatsApp or triggered from the dashboard).
-// Change the wording here and it updates in both places automatically.
-const FAREWELL_MESSAGE = `Thank you for contacting ${COMPANY_NAME}! If you need anything else, feel free to reach out anytime. Have a great day! 😊`;
 
 let sessions = loadSessions();
 let io = null; // set once the dashboard starts, used to push live updates
@@ -36,6 +33,71 @@ const pendingBotTexts = new Map();
 
 function now() {
   return Date.now();
+}
+
+// Looks up a translated string by key + language, falling back to English
+// if a language is somehow missing (shouldn't happen, but avoids a crash
+// or blank message over a missing entry). Supports {placeholder} filling,
+// e.g. t('askName', 'ar', { company: 'Alforkan Tours' }).
+function t(key, lang, vars) {
+  const entry = translations[key];
+  if (!entry) {
+    console.error(`Missing translation key: ${key}`);
+    return key;
+  }
+  let str = entry[lang] || entry.en;
+  if (vars) {
+    Object.keys(vars).forEach((k) => {
+      str = str.split(`{${k}}`).join(vars[k]);
+    });
+  }
+  return str;
+}
+
+// Walks flows.categories following `path` (an array of node ids) and
+// returns the node at the end of that path, or null if the path is
+// invalid. An empty path has no "current node" - that's the root menu.
+function findNode(path) {
+  let options = flows.categories;
+  let node = null;
+  for (const id of path) {
+    node = options ? options.find((o) => o.id === id) : null;
+    if (!node) return null;
+    options = node.subMenu ? node.subMenu.options : null;
+  }
+  return node;
+}
+
+// Returns the list of selectable options at the given path - the top-level
+// categories if path is empty, or a sub-menu's options if the node at that
+// path has one. Returns null if the path leads to a leaf (a category with
+// fields, not further choices) or is invalid.
+function getOptionsAtPath(path) {
+  if (path.length === 0) return flows.categories;
+  const node = findNode(path);
+  return node && node.subMenu ? node.subMenu.options : null;
+}
+
+// Builds a translated, numbered menu string from a list of options.
+function renderMenu(options, lang) {
+  return options.map((o, i) => `${i + 1}️⃣ ${t(o.label, lang)}`).join('\n');
+}
+
+// Builds a human-readable trail of category labels for a given path, e.g.
+// "Umrah trips — Visa only — 1 month". Used both for the confirmation
+// message shown to the customer (in their language) and for the internal
+// dashboard/email record (always forced to English - see the CONFIRM
+// handler below for why).
+function pathLabel(path, lang) {
+  let options = flows.categories;
+  const labels = [];
+  for (const id of path) {
+    const node = options ? options.find((o) => o.id === id) : null;
+    if (!node) break;
+    labels.push(t(node.label, lang));
+    options = node.subMenu ? node.subMenu.options : null;
+  }
+  return labels.join(' — ');
 }
 
 function getSession(chatId) {
@@ -125,12 +187,16 @@ async function botSend(chatId, text) {
 // message instead of a raw "bot reset" system message. Shared by both the
 // /done command (typed directly in WhatsApp) and the dashboard's /done
 // shortcut, so the reset logic and wording only need to exist in one place.
+// Uses whichever language the chat had selected, falling back to English
+// if the chat never got that far (e.g. reset before language was picked).
 async function resetChatWithFarewell(chatId) {
+  const lang = (sessions[chatId] && sessions[chatId].data && sessions[chatId].data.language) || 'en';
+  const farewellText = t('farewell', lang, { company: COMPANY_NAME });
   sessions[chatId] = { state: 'IDLE', data: {}, lastActivity: now(), claimedNotified: false };
   saveSessions(sessions);
   clearMessages(chatId);
-  registerPendingText(chatId, FAREWELL_MESSAGE);
-  await client.sendMessage(chatId, FAREWELL_MESSAGE);
+  registerPendingText(chatId, farewellText);
+  await client.sendMessage(chatId, farewellText);
   if (io) io.emit('pending_updated');
 }
 
@@ -141,112 +207,183 @@ async function handleCustomerMessage(chatId, text) {
     return;
   }
 
+  const lang = session.data.language || 'en';
+
   switch (session.state) {
+    // Language hasn't been picked yet, so this message is shown in both
+    // languages at once - it's the one place in the whole flow where we
+    // can't yet know which language to reply in.
     case 'IDLE': {
-      setState(chatId, 'ASK_NAME');
+      setState(chatId, 'ASK_LANGUAGE');
       await botSend(
         chatId,
-        `Welcome to ${COMPANY_NAME}! ✈️\nI'll grab a few details before connecting you with our team.\n\nWhat's your name?`
+        `Welcome to ${COMPANY_NAME}! ✈️\nPlease choose your language / يرجى اختيار اللغة:\n\n1️⃣ English\n2️⃣ العربية`
       );
+      break;
+    }
+
+    case 'ASK_LANGUAGE': {
+      const reply = text.trim();
+      let chosen = null;
+      if (reply === '1' || /english/i.test(reply)) chosen = 'en';
+      else if (reply === '2' || /عرب/.test(reply)) chosen = 'ar';
+
+      if (!chosen) {
+        await botSend(
+          chatId,
+          `Sorry, I didn't understand. Please reply 1 for English or 2 for العربية.\n\nعذرًا، لم أفهم ردك. يرجى الرد بـ 1 للغة الإنجليزية أو 2 للغة العربية.`
+        );
+        break;
+      }
+
+      setData(chatId, 'language', chosen);
+      setState(chatId, 'ASK_NAME');
+      await botSend(chatId, t('askName', chosen, { company: COMPANY_NAME }));
       break;
     }
 
     case 'ASK_NAME': {
       setData(chatId, 'name', text);
-      setState(chatId, 'ASK_TYPE');
+      setData(chatId, 'categoryPath', []);
+      setState(chatId, 'SELECT_CATEGORY');
       await botSend(
         chatId,
-        `Thanks, ${text}! What can we help you with?\n1️⃣ Schedule change on an existing booking\n2️⃣ Flight price / new booking inquiry\n\nReply with 1 or 2.`
+        `${t('menuIntro', lang, { name: text })}\n\n${renderMenu(flows.categories, lang)}`
       );
       break;
     }
 
-    case 'ASK_TYPE': {
-      const lower = text.toLowerCase();
-      if (lower.includes('1') || lower.includes('schedule') || lower.includes('change')) {
-        setData(chatId, 'inquiryType', 'Schedule change');
-        setState(chatId, 'ASK_BOOKING_REF');
-        await botSend(chatId, 'Got it. What is your booking reference (PNR) or flight number?');
-      } else if (lower.includes('2') || lower.includes('price') || lower.includes('book')) {
-        setData(chatId, 'inquiryType', 'Flight price / new booking');
-        setState(chatId, 'ASK_ROUTE');
-        await botSend(chatId, 'Sure! What are your origin and destination? (e.g. Cairo to Dubai)');
+    // Generic menu/sub-menu navigation - handles the top-level menu AND
+    // every sub-menu (Tourism, Umrah, Visa duration) the same way, driven
+    // entirely by categoryPath and flows.js. No category-specific code here.
+    case 'SELECT_CATEGORY': {
+      const currentPath = sessions[chatId].data.categoryPath || [];
+      const options = getOptionsAtPath(currentPath);
+
+      if (!options) {
+        // Shouldn't happen in normal use - safety net in case of a
+        // corrupted/edited session. Restart at the name step.
+        setState(chatId, 'ASK_NAME');
+        await botSend(chatId, t('askName', lang, { company: COMPANY_NAME }));
+        break;
+      }
+
+      const idx = parseInt(text.trim(), 10) - 1;
+      if (Number.isNaN(idx) || idx < 0 || idx >= options.length) {
+        await botSend(chatId, `${t('invalidChoice', lang)}\n\n${renderMenu(options, lang)}`);
+        break;
+      }
+
+      const chosen = options[idx];
+      const newPath = [...currentPath, chosen.id];
+      setData(chatId, 'categoryPath', newPath);
+
+      if (chosen.subMenu) {
+        // Still navigating - show the next sub-menu, stay in this state.
+        await botSend(
+          chatId,
+          `${t(chosen.subMenu.prompt, lang)}\n\n${renderMenu(chosen.subMenu.options, lang)}`
+        );
       } else {
-        await botSend(chatId, 'Sorry, I didn\'t catch that. Please reply with 1 for Schedule change or 2 for Flight price inquiry.');
+        // Reached a leaf category - start collecting its fields.
+        setData(chatId, 'fields', {});
+        setData(chatId, 'fieldIndex', 0);
+        setState(chatId, 'COLLECT_FIELD');
+        await botSend(chatId, t(chosen.fields[0].prompt, lang));
       }
       break;
     }
 
-    case 'ASK_BOOKING_REF': {
-      setData(chatId, 'bookingRef', text);
-      setState(chatId, 'ASK_CHANGE_DETAILS');
-      await botSend(chatId, 'Thanks. What change would you like to make? (e.g. new date, cancellation, etc.)');
-      break;
-    }
+    // Generic field collector - asks each field in the current leaf
+    // category's `fields` list in order, one per customer message.
+    case 'COLLECT_FIELD': {
+      const currentPath = sessions[chatId].data.categoryPath || [];
+      const node = findNode(currentPath);
 
-    case 'ASK_CHANGE_DETAILS': {
-      setData(chatId, 'changeDetails', text);
-      setState(chatId, 'CONFIRM');
-      const s = sessions[chatId].data;
-      await botSend(
-        chatId,
-        `Please confirm:\n\n` +
-        `👤 Name: ${s.name}\n` +
-        `📋 Request: ${s.inquiryType}\n` +
-        `🎫 Booking ref: ${s.bookingRef}\n` +
-        `✏️ Change needed: ${s.changeDetails}\n\n` +
-        `Reply YES to confirm, or NO to start over.`
-      );
-      break;
-    }
+      if (!node || !node.fields) {
+        setState(chatId, 'ASK_NAME');
+        await botSend(chatId, t('askName', lang, { company: COMPANY_NAME }));
+        break;
+      }
 
-    case 'ASK_ROUTE': {
-      setData(chatId, 'route', text);
-      setState(chatId, 'ASK_DATES');
-      await botSend(chatId, 'And what are your preferred travel dates?');
-      break;
-    }
+      const fieldIndex = sessions[chatId].data.fieldIndex || 0;
+      const field = node.fields[fieldIndex];
+      const updatedFields = { ...sessions[chatId].data.fields, [field.key]: text };
+      setData(chatId, 'fields', updatedFields);
 
-    case 'ASK_DATES': {
-      setData(chatId, 'dates', text);
-      setState(chatId, 'CONFIRM');
-      const s = sessions[chatId].data;
-      await botSend(
-        chatId,
-        `Please confirm:\n\n` +
-        `👤 Name: ${s.name}\n` +
-        `📋 Request: ${s.inquiryType}\n` +
-        `🛫 Route: ${s.route}\n` +
-        `📅 Dates: ${s.dates}\n\n` +
-        `Reply YES to confirm, or NO to start over.`
-      );
+      const nextIndex = fieldIndex + 1;
+      if (nextIndex < node.fields.length) {
+        setData(chatId, 'fieldIndex', nextIndex);
+        await botSend(chatId, t(node.fields[nextIndex].prompt, lang));
+      } else {
+        setState(chatId, 'CONFIRM');
+        const summaryLines = node.fields
+          .map((f) => `${t(f.label, lang)}: ${updatedFields[f.key]}`)
+          .join('\n');
+        await botSend(
+          chatId,
+          `${t('confirmIntro', lang)}\n\n` +
+          `👤 ${t('nameLabel', lang)}: ${sessions[chatId].data.name}\n` +
+          `📋 ${pathLabel(currentPath, lang)}\n` +
+          `${summaryLines}\n\n` +
+          `${t('confirmPrompt', lang)}`
+        );
+      }
       break;
     }
 
     case 'CONFIRM': {
-      const lower = text.toLowerCase();
-      if (lower.includes('yes') || lower === 'y') {
+      const trimmed = text.trim();
+      const lower = trimmed.toLowerCase();
+      const isYes = lower === 'yes' || lower === 'y' || trimmed === 'نعم' || trimmed === 'ن';
+      const isNo = lower === 'no' || lower === 'n' || trimmed === 'لا';
+
+      if (isYes) {
+        const currentPath = sessions[chatId].data.categoryPath || [];
+        const node = findNode(currentPath);
+        const fields = sessions[chatId].data.fields || {};
+
+        // English labels only, regardless of the customer's chosen
+        // language - this is what A/B see on the dashboard and what goes
+        // into the notification email, and both should stay in one
+        // consistent language rather than switching per customer.
+        const inquiryTypeEn = pathLabel(currentPath, 'en');
+        const summaryLinesEn = (node.fields || []).map((f) => ({
+          label: t(f.label, 'en'),
+          value: fields[f.key],
+        }));
+
         const completedInquiry = {
           chatId,
-          ...sessions[chatId].data,
+          name: sessions[chatId].data.name,
+          language: lang,
+          category: inquiryTypeEn,
+          ...fields,
           confirmedAt: new Date().toISOString(),
         };
         appendCompletedOrder(completedInquiry);
+
+        setData(chatId, 'inquiryType', inquiryTypeEn);
+        setData(chatId, 'summaryLines', summaryLinesEn);
+
         setState(chatId, 'HANDED_OFF');
         sessions[chatId].claimedNotified = false;
         saveSessions(sessions);
-        await botSend(
-          chatId,
-          'Thank you! ✅ Your request has been received — a team member will follow up with you shortly.'
-        );
+
+        await botSend(chatId, t('confirmAccepted', lang));
         await notifyNewRequest(sessions[chatId].data);
         if (io) io.emit('pending_updated');
-      } else if (lower.includes('no') || lower === 'n') {
-        sessions[chatId] = { state: 'ASK_NAME', data: {}, lastActivity: now(), claimedNotified: false };
+      } else if (isNo) {
+        sessions[chatId] = {
+          state: 'ASK_NAME',
+          data: { language: lang },
+          lastActivity: now(),
+          claimedNotified: false,
+        };
         saveSessions(sessions);
-        await botSend(chatId, 'No problem, let\'s start over. What\'s your name?');
+        await botSend(chatId, t('confirmRestart', lang));
       } else {
-        await botSend(chatId, 'Please reply YES to confirm or NO to start over.');
+        await botSend(chatId, t('confirmPrompt', lang));
       }
       break;
     }

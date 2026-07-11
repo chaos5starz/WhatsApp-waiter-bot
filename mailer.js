@@ -35,17 +35,21 @@ async function sendMail(recipients, subject, text) {
   }
 }
 
+// data.summaryLines is a category-agnostic array of {label, value} pairs
+// built by index.js from whichever fields that category's flow collected -
+// this function no longer needs to know about specific field names
+// (bookingRef, route, dates, etc.), so it automatically supports every
+// category in flows.js, including ones added later.
 function notifyNewRequest(data) {
   const lines = [
     'A new client request is ready for a response.',
     '',
     `Name: ${data.name || '-'}`,
-    `Inquiry type: ${data.inquiryType || '-'}`,
+    `Category: ${data.inquiryType || '-'}`,
   ];
-  if (data.bookingRef) lines.push(`Booking ref: ${data.bookingRef}`);
-  if (data.changeDetails) lines.push(`Change needed: ${data.changeDetails}`);
-  if (data.route) lines.push(`Route: ${data.route}`);
-  if (data.dates) lines.push(`Dates: ${data.dates}`);
+  (data.summaryLines || []).forEach((f) => {
+    if (f.value) lines.push(`${f.label}: ${f.value}`);
+  });
   lines.push('', 'Whoever is available, please reply on WhatsApp.');
 
   // A brand new handoff always goes to everyone with a real email on file -
