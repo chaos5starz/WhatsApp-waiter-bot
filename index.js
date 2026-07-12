@@ -31,6 +31,15 @@ let io = null; // set once the dashboard starts, used to push live updates
 // to distinguish them.
 const pendingBotTexts = new Map();
 
+// Recorded the moment this run of the bot starts. WhatsApp Web replays
+// recent chat history through the same message_create event used for
+// live messages when the client (re)connects - with no built-in way to
+// tell "just happened" apart from "backlog from before I was running".
+// Any message older than this gets ignored in the message_create handler
+// below, so a fresh restart doesn't misinterpret old texts (yours or a
+// customer's) as live flow answers.
+const BOOT_TIMESTAMP = Math.floor(Date.now() / 1000);
+
 function now() {
   return Date.now();
 }
@@ -412,6 +421,10 @@ async function handleCustomerMessage(chatId, text) {
 
 client.on('message_create', async (message) => {
   try {
+    // Ignore anything from before this run started - see BOOT_TIMESTAMP
+    // above. message.timestamp is Unix seconds, set by WhatsApp itself.
+    if (message.timestamp && message.timestamp < BOOT_TIMESTAMP) return;
+
     const chat = await message.getChat();
     if (chat.isGroup) return;
 
