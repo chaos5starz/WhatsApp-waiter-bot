@@ -48,7 +48,7 @@ module.exports = {
 
   // ---- Top-level category labels ----
   flightBookingLabel: { en: `Flight ticket booking`, ar: `حجز تذاكر طيران` },
-  bookingInquiryLabel: { en: `Booking inquiry`, ar: `استفسار عن حجز` },
+  bookingInquiryLabel: { en: `schedule change and refund`, ar: "الالغاء والتعديل" },
   tourismLabel: { en: `Tourism & Hotels`, ar: `سياحة وحجز فنادق` },
   insuranceLabel: { en: `Travel health insurance`, ar: `تأمين صحي للمسافرين` },
   umrahLabel: { en: `Umrah trips`, ar: `رحلات العمرة` },

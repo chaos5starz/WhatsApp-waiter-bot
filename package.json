@@ -5,7 +5,9 @@
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "start:clean": "bash clean-start.sh",
+    "tunnel": "cloudflared tunnel --url http://localhost:3000"
   },
   "dependencies": {
     "dotenv": "^17.4.2",

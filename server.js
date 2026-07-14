@@ -216,6 +216,12 @@ function startDashboard({ client, sessions, saveSessions, notifyClaimed, registe
     res.sendFile(filePath);
   });
 
+    // ---- Root redirect ----
+  // No index.html exists in public/ - without this, hitting the bare
+  // domain (or the Cloudflare tunnel root URL) returns Express's default
+  // "Cannot GET /" instead of sending people to the login page.
+  app.get('/', (req, res) => res.redirect('/login.html'));
+
   // ---- Serve the frontend files ----
   app.use(express.static(path.join(__dirname, 'public')));
 
