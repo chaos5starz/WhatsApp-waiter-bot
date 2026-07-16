@@ -27,14 +27,18 @@
   .msg.bot { background: #1f2c34; float: left; border-left: 3px solid #53bdeb; }
   .msg.agent { background: #005c4b; float: right; }
   .msg img { max-width: 100%; border-radius: 4px; margin-top: 6px; }
+  .msg audio { margin-top: 6px; max-width: 100%; }
   .msg a { color: #53bdeb; }
   .msg .meta { font-size: 11px; color: #8696a0; margin-top: 4px; }
 
-  #composer { display: flex; padding: 12px; background: #202c33; gap: 8px; }
+  #composer { display: flex; flex-direction: column; padding: 12px; background: #202c33; gap: 6px; }
+  #composer-row { display: flex; gap: 8px; align-items: center; }
   #text-input { flex: 1; padding: 10px; border-radius: 20px; border: none; }
   #send-btn, #file-label { background: #00a884; color: white; border: none; padding: 10px 16px;
                             border-radius: 20px; cursor: pointer; }
+  #send-btn:disabled, #file-label.disabled { opacity: 0.6; cursor: not-allowed; }
   #file-input { display: none; }
+  #file-selected-name { font-size: 12px; color: #8696a0; padding-left: 4px; min-height: 16px; }
 
   #empty-state { flex: 1; display: flex; align-items: center; justify-content: center; color: #8696a0; }
 </style>
@@ -65,6 +69,17 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str == null ? '' : String(str);
   return div.innerHTML;
+}
+
+// mediaFile is built server-side from things like the customer's original
+// filename or a detected extension, and can contain spaces or other
+// characters that aren't safe to drop straight into a URL (e.g. a raw
+// space breaks the src/href entirely, making the browser fail to load it
+// silently - previously the most likely cause of media looking "stuck").
+// encodeURIComponent() here pairs with the backend's own path.basename()
+// safety check in server.js, which decodes req.params.filename normally.
+function mediaUrl(mediaFile) {
+  return `/media/${encodeURIComponent(mediaFile)}`;
 }
 
 async function checkAuthAndLoad() {
@@ -102,9 +117,14 @@ function renderMessage(entry) {
 
   let content = '';
   if (entry.type === 'image' && entry.mediaFile) {
-    content += `<img src="/media/${entry.mediaFile}" />`;
+    content += `<img src="${mediaUrl(entry.mediaFile)}" />`;
+  } else if (entry.type === 'voice' && entry.mediaFile) {
+    // Voice notes get an inline player so the agent can actually listen,
+    // instead of a generic "Download file" link that gave no indication
+    // it was audio at all.
+    content += `<audio controls src="${mediaUrl(entry.mediaFile)}"></audio>`;
   } else if (entry.type === 'document' && entry.mediaFile) {
-    content += `<a href="/media/${entry.mediaFile}" target="_blank">📄 Download file</a>`;
+    content += `<a href="${mediaUrl(entry.mediaFile)}" target="_blank">📄 Download file</a>`;
   }
   if (entry.text) content += `<div>${escapeHtml(entry.text)}</div>`;
   content += `<div class="meta">${entry.sender} · ${new Date(entry.timestamp).toLocaleTimeString()}</div>`;
@@ -126,15 +146,26 @@ async function openChat(chatId, data) {
     </div>
     <div id="messages"></div>
     <div id="composer">
-      <label id="file-label" for="file-input">📎</label>
-      <input type="file" id="file-input" />
-      <input type="text" id="text-input" placeholder="Type a message..." />
-      <button id="send-btn" onclick="sendMessage()">Send</button>
+      <div id="file-selected-name"></div>
+      <div id="composer-row">
+        <label id="file-label" for="file-input">📎</label>
+        <input type="file" id="file-input" />
+        <input type="text" id="text-input" placeholder="Type a message..." />
+        <button id="send-btn" onclick="sendMessage()">Send</button>
+      </div>
     </div>
   `;
 
   document.getElementById('text-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') sendMessage();
+  });
+
+  // Shows which file is currently attached, so choosing a file gives
+  // visible feedback instead of looking like nothing happened until Send
+  // is clicked.
+  document.getElementById('file-input').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    document.getElementById('file-selected-name').textContent = file ? `📎 ${file.name}` : '';
   });
 
   const res = await fetch(`/api/chat/${encodeURIComponent(chatId)}/messages`);
@@ -147,35 +178,64 @@ async function openChat(chatId, data) {
 async function sendMessage() {
   const textInput = document.getElementById('text-input');
   const fileInput = document.getElementById('file-input');
+  const sendBtn = document.getElementById('send-btn');
+  const fileLabel = document.getElementById('file-label');
   const text = textInput.value.trim();
   const file = fileInput.files[0];
 
   if (!text && !file) return;
 
-  const formData = new FormData();
-  formData.append('text', text);
-  if (file) formData.append('file', file);
+  // Disable the composer for the duration of the send - sending a file
+  // (especially a larger one) can take a few seconds, since it has to be
+  // encoded and pushed through the WhatsApp session. Without this, a
+  // second click while the first send was still in flight fired a genuine
+  // duplicate send, which is likely what made file sends feel "weirder and
+  // slower" than plain text - two uploads competing for the same request,
+  // not one just being slow.
+  sendBtn.disabled = true;
+  fileLabel.classList.add('disabled');
+  const originalSendLabel = sendBtn.textContent;
+  sendBtn.textContent = 'Sending...';
 
-  const res = await fetch(`/api/chat/${encodeURIComponent(currentChatId)}/send`, {
-    method: 'POST',
-    body: formData,
-  });
+  try {
+    const formData = new FormData();
+    formData.append('text', text);
+    if (file) formData.append('file', file);
 
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    alert(body.error || 'Failed to send message.');
-    if (res.status === 409) {
-      // Chat is no longer active (auto-reset, resolved elsewhere, etc.) -
-      // bail out of this chat view instead of leaving a dead composer open.
-      currentChatId = null;
-      document.getElementById('main').innerHTML = '<div id="empty-state">Select a chat from the left</div>';
-      loadPending();
+    const res = await fetch(`/api/chat/${encodeURIComponent(currentChatId)}/send`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      alert(body.error || 'Failed to send message.');
+      if (res.status === 409) {
+        // Chat is no longer active (auto-reset, resolved elsewhere, etc.) -
+        // bail out of this chat view instead of leaving a dead composer open.
+        currentChatId = null;
+        document.getElementById('main').innerHTML = '<div id="empty-state">Select a chat from the left</div>';
+        loadPending();
+      }
+      return;
     }
-    return;
-  }
 
-  textInput.value = '';
-  fileInput.value = '';
+    textInput.value = '';
+    fileInput.value = '';
+    const nameLabel = document.getElementById('file-selected-name');
+    if (nameLabel) nameLabel.textContent = '';
+  } finally {
+    // Re-enable even if currentChatId was cleared above (elements may
+    // already be gone in that case, hence the guards) or if the request
+    // failed outright.
+    if (document.body.contains(sendBtn)) {
+      sendBtn.disabled = false;
+      sendBtn.textContent = originalSendLabel;
+    }
+    if (document.body.contains(fileLabel)) {
+      fileLabel.classList.remove('disabled');
+    }
+  }
 }
 
 async function resolveChat() {

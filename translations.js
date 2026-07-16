@@ -21,6 +21,10 @@ module.exports = {
     en: `Sorry, that's not a valid option. Please reply with one of the numbers shown above.`,
     ar: `عذرًا، هذا ليس خيارًا صحيحًا. يرجى الرد بأحد الأرقام الموضحة أعلاه.`,
   },
+  mediaNotSupported: {
+    en: `Sorry, I can only understand text messages at this stage. Please reply by typing your answer.`,
+    ar: `عذرًا، لا يمكنني في هذه المرحلة فهم سوى الرسائل النصية. يرجى الرد بكتابة إجابتك.`,
+  },
   confirmIntro: {
     en: `Please confirm your request:`,
     ar: `يرجى تأكيد طلبك:`,

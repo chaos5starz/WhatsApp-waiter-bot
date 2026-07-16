@@ -17,7 +17,7 @@ const { startDashboard } = require('./server');
 const translations = require('./translations');
 const flows = require('./flows');
 
-const RESET_AFTER_HOURS = 24;
+const RESET_AFTER_HOURS = 1;
 const COMPANY_NAME = 'Alforkan Tours';
 const DASHBOARD_PORT = 3000;
 
@@ -150,6 +150,17 @@ function registerPendingText(chatId, text) {
   pendingBotTexts.get(chatId).push(text);
 }
 
+// Retries message.getChat() once after a short delay. WhatsApp Web can force
+// an internal resync at any time - most commonly observed when another
+// device (phone, WhatsApp Desktop, etc.) links or reconnects on the same
+// account - and during that resync window the injected page-side Store
+// object isn't fully hydrated yet. A message that arrives in that exact
+// window makes getChat() throw (surfaces as a cryptic minified error like
+// "r: r"), even though the client already reported 'ready'. In practice
+// this is transient - the resync finishes a moment later - so retrying
+// once recovers the message instead of silently dropping it.
+
+
 const client = new Client({
   authStrategy: new LocalAuth(),
   puppeteer: {
@@ -171,6 +182,8 @@ client.on('authenticated', () => {
   console.log('WhatsApp authenticated, finishing startup...');
 });
 
+const STALE_SESSION_SWEEP_INTERVAL_MS = 5 * 60 * 1000; // check every 5 minutes
+
 client.on('ready', () => {
   console.log('WhatsApp bot is ready and connected.');
   io = startDashboard({
@@ -182,6 +195,9 @@ client.on('ready', () => {
     resetChatWithFarewell,
     port: DASHBOARD_PORT,
   });
+  // Only start once the client can actually send messages - sweeping (and
+  // trying to send farewell texts) before 'ready' would just fail.
+  setInterval(sweepStaleSessions, STALE_SESSION_SWEEP_INTERVAL_MS);
 });
 
 client.on('auth_failure', (msg) => {
@@ -215,6 +231,32 @@ async function resetChatWithFarewell(chatId) {
   registerPendingText(chatId, farewellText);
   await client.sendMessage(chatId, farewellText);
   if (io) io.emit('pending_updated');
+}
+
+const RESET_AFTER_MS = RESET_AFTER_HOURS * 60 * 60 * 1000;
+
+// Actively resets any chat that's been inactive past RESET_AFTER_HOURS,
+// instead of only resetting the NEXT time that customer happens to message
+// again (getSession()'s lazy check, below, still exists as a safety net for
+// sessions this sweep hasn't caught yet). Without this, a chat with no
+// further customer replies would sit open (and HANDED_OFF chats would stay
+// in the dashboard's pending list) indefinitely - the customer never gets
+// a closing message and a responder never finds out it went stale.
+// Applies to any non-IDLE state (mid-flow chats included, not just
+// HANDED_OFF ones) to match the reset window's existing meaning.
+async function sweepStaleSessions() {
+  const staleChatIds = Object.keys(sessions).filter((chatId) => {
+    const s = sessions[chatId];
+    return s && s.state !== 'IDLE' && now() - (s.lastActivity || 0) > RESET_AFTER_MS;
+  });
+  for (const chatId of staleChatIds) {
+    try {
+      console.log(`Auto-resetting stale chat ${chatId} after ${RESET_AFTER_HOURS}h of inactivity.`);
+      await resetChatWithFarewell(chatId);
+    } catch (err) {
+      console.error(`Failed to auto-reset stale chat ${chatId}:`, err);
+    }
+  }
 }
 
 async function handleCustomerMessage(chatId, text) {
@@ -420,16 +462,24 @@ async function handleCustomerMessage(chatId, text) {
 }
 
 client.on('message_create', async (message) => {
+  // Captured up front, before anything else can throw, so the catch block
+  // below always has something useful to log - previously a failure here
+  // (e.g. the getChat() resync issue) produced only a bare stack trace with
+  // no indication of which chat or message text was actually lost.
+  const rawFrom = message.from;
+  const rawTo = message.to;
+  const rawFromMe = message.fromMe;
+  const rawBody = (message.body || '').slice(0, 200);
+
   try {
     // Ignore anything from before this run started - see BOOT_TIMESTAMP
     // above. message.timestamp is Unix seconds, set by WhatsApp itself.
     if (message.timestamp && message.timestamp < BOOT_TIMESTAMP) return;
 
-    const chat = await message.getChat();
-    if (chat.isGroup) return;
-
     const chatId = message.from === 'status@broadcast' ? null : (message.fromMe ? message.to : message.from);
     if (!chatId) return;
+
+    if (chatId.endsWith('@g.us')) return;
 
     const text = (message.body || '').trim();
 
@@ -492,18 +542,53 @@ client.on('message_create', async (message) => {
       try {
         const media = await message.downloadMedia();
         if (media) {
-          const ext = media.mimetype.split('/')[1] || 'bin';
+          // media.mimetype can carry extra parameters (e.g. voice notes are
+          // "audio/ogg; codecs=opus") - splitting on '/' alone left those
+          // parameters IN the extension, producing filenames like
+          // "...customer.ogg; codecs=opus" (spaces and semicolons). Those
+          // then broke when used unescaped in the dashboard's <img>/<a>
+          // src/href, which is why media looked "stuck"/slow rather than
+          // erroring cleanly. Stripping at the first ';' and keeping only
+          // safe characters guarantees a clean, URL-safe extension.
+          const rawSubtype = media.mimetype.split(';')[0].split('/')[1] || 'bin';
+          const ext = rawSubtype.replace(/[^a-zA-Z0-9]/g, '') || 'bin';
           const filename = `${Date.now()}-customer.${ext}`;
           fs.writeFileSync(path.join(MEDIA_DIR, filename), Buffer.from(media.data, 'base64'));
+
+          let mediaType = 'document';
+          if (media.mimetype.startsWith('image/')) mediaType = 'image';
+          // Voice notes and regular audio files both come through as
+          // audio/* - tagged distinctly so the dashboard can render an
+          // <audio> player (agents need to actually listen to these, a
+          // generic "Download file" link isn't enough).
+          else if (media.mimetype.startsWith('audio/')) mediaType = 'voice';
+
           logAndBroadcast(chatId, {
             sender: 'customer',
-            type: media.mimetype.startsWith('image/') ? 'image' : 'document',
+            type: mediaType,
             text: message.body || '',
             mediaFile: filename,
           });
         }
       } catch (mediaErr) {
-        console.error('Failed to download customer media:', mediaErr);
+  console.error(`Failed to download customer media (from: ${message.from}):`, mediaErr);
+  logAndBroadcast(chatId, {
+    sender: 'customer',
+    type: 'text',
+    text: `📎 [${message.type || 'Media'} message received — could not be downloaded, ask the customer to resend or call them]`,
+  });
+}
+
+      // Previously, media-only messages (voice notes especially) got no
+      // bot reply at all - handleCustomerMessage() below only runs when
+      // `text` is non-empty, so a customer sending a voice note mid-flow
+      // was silently ignored (unlike an emoji/text reply, which correctly
+      // gets "invalid choice"). Once handed off, a human is answering, so
+      // the bot should stay quiet just like it does for text messages.
+      const mediaSession = getSession(chatId);
+      if (mediaSession.state !== 'HANDED_OFF') {
+        const mediaLang = mediaSession.data.language || 'en';
+        await botSend(chatId, t('mediaNotSupported', mediaLang));
       }
     } else if (text) {
       logAndBroadcast(chatId, { sender: 'customer', type: 'text', text });
@@ -513,7 +598,14 @@ client.on('message_create', async (message) => {
       await handleCustomerMessage(chatId, text);
     }
   } catch (err) {
-    console.error('Error handling message:', err);
+    // Logs enough to actually follow up manually if a real customer message
+    // gets lost to a transient WhatsApp Web issue (e.g. the resync case
+    // getChatWithRetry() tries to recover from above) - a bare stack trace
+    // gave no way to tell who was affected.
+    console.error(
+      `Error handling message (from: ${rawFrom}, to: ${rawTo}, fromMe: ${rawFromMe}, body: ${JSON.stringify(rawBody)}):`,
+      err
+    );
   }
 });
 

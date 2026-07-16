@@ -253,6 +253,37 @@ function startDashboard({ client, sessions, saveSessions, notifyClaimed, registe
     res.status(500).json({ error: 'Something went wrong.' });
   });
 
+  // Without this handler, a port conflict (e.g. a previous run of this bot
+  // still running in another terminal) throws as an UNCAUGHT exception and
+  // kills the entire process. Just catching it and calling process.exit()
+  // isn't enough on its own, though: by this point in startup, the
+  // WhatsApp client (and its Puppeteer-launched Chromium) is already fully
+  // running - process.exit() only kills the Node process, not Chromium as
+  // a detached child, which then sits there holding a lock on
+  // .wwebjs_auth/session and makes EVERY subsequent run fail with
+  // "The browser is already running for ... Use a different userDataDir
+  // or stop the running browser first." - even after the port conflict
+  // itself is gone. So this closes the WhatsApp client (and its Chromium)
+  // properly first, THEN exits.
+  server.on('error', async (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(
+        `\n❌ Port ${port} is already in use - most likely a previous run of this bot ` +
+        `is still running in another terminal, or didn't shut down cleanly.\n` +
+        `   Close that terminal/process, or run "npm run start:clean" (also frees ` +
+        `this port and any leftover Chromium automatically), then try again.\n`
+      );
+    } else {
+      console.error('Dashboard server error:', err);
+    }
+    try {
+      await client.destroy();
+    } catch (destroyErr) {
+      console.error('Error while closing the WhatsApp client during shutdown:', destroyErr);
+    }
+    process.exit(1);
+  });
+
   server.listen(port, () => {
     console.log(`Dashboard running at http://localhost:${port}`);
   });
