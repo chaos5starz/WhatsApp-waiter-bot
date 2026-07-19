@@ -37,7 +37,12 @@ async function login() {
   if (res.ok) {
     window.location.href = '/dashboard.html';
   } else {
-    document.getElementById('error').textContent = 'Invalid username or password.';
+      if (res.ok) {
+      window.location.href = '/dashboard.html';
+    } else {
+      const body = await res.json().catch(() => ({}));
+      document.getElementById('error').textContent = body.error || 'Invalid username or password.';
+    }
   }
 }
 </script>

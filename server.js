@@ -18,6 +18,44 @@ const fs = require('fs');
 const { getMessages, appendMessage, clearMessages, MEDIA_DIR } = require('./store');
 const RESPONDERS = require('./responders');
 
+
+// ---- Login rate limiting ----
+// Simple in-memory limiter, same pattern as pendingBotTexts elsewhere in
+// this file - no database or external package needed for a handful of
+// trusted responders.
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const LOGIN_LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
+
+// key (IP) -> { count, windowStart, blockedUntil }
+const loginAttempts = new Map();
+
+function checkLoginRateLimit(key) {
+  const entry = loginAttempts.get(key);
+  if (!entry) return { blocked: false };
+  if (entry.blockedUntil && entry.blockedUntil > Date.now()) {
+    return { blocked: true, retryAfterMs: entry.blockedUntil - Date.now() };
+  }
+  return { blocked: false };
+}
+
+function recordFailedLogin(key) {
+  const now = Date.now();
+  let entry = loginAttempts.get(key);
+  if (!entry || now - entry.windowStart > LOGIN_WINDOW_MS) {
+    entry = { count: 0, windowStart: now, blockedUntil: 0 };
+  }
+  entry.count += 1;
+  if (entry.count >= LOGIN_MAX_ATTEMPTS) {
+    entry.blockedUntil = now + LOGIN_LOCKOUT_MS;
+  }
+  loginAttempts.set(key, entry);
+}
+
+function clearLoginAttempts(key) {
+  loginAttempts.delete(key);
+}
+
 const SESSION_SECRET = process.env.SESSION_SECRET;
 if (!SESSION_SECRET) {
   throw new Error('SESSION_SECRET is not set. Add it to your .env file before starting the server.');
@@ -41,6 +79,11 @@ function safeMediaPath(filename) {
 
 function startDashboard({ sock, sessions, saveSessions, notifyClaimed, registerPendingText, resetChatWithFarewell, port }) {
   const app = express();
+  // Needed so req.ip reflects the real visitor IP instead of Cloudflare's
+  // tunnel/proxy IP once this is running behind cloudflared or a VPS
+  // reverse proxy - otherwise every login attempt would appear to come
+  // from the same address and the limiter would lock everyone out together.
+  app.set('trust proxy', 1);
   const server = http.createServer(app);
   const io = new Server(server);
 
@@ -60,13 +103,23 @@ function startDashboard({ sock, sessions, saveSessions, notifyClaimed, registerP
   }
 
   app.post('/api/login', (req, res) => {
+    const key = req.ip;
+    const limit = checkLoginRateLimit(key);
+    if (limit.blocked) {
+      const minutes = Math.ceil(limit.retryAfterMs / 60000);
+      return res.status(429).json({ error: `Too many failed attempts. Try again in about ${minutes} minute(s).` });
+    }
+
     const { username, password } = req.body;
     const match = RESPONDERS.find((r) => r.username === username && r.password === password);
     if (match) {
+      clearLoginAttempts(key);
       req.session.loggedIn = true;
       req.session.username = username;
       return res.json({ ok: true });
     }
+
+    recordFailedLogin(key);
     return res.status(401).json({ error: 'Invalid credentials' });
   });
 
