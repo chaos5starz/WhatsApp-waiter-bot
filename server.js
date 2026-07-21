@@ -124,7 +124,15 @@ function startDashboard({ sock, sessions, saveSessions, notifyClaimed, registerP
   });
 
   app.post('/api/logout', (req, res) => {
-    req.session.destroy(() => res.json({ ok: true }));
+    req.session.destroy((err) => {
+      if (err) {
+        console.error('Logout error:', err);
+        return res.status(500).json({ error: 'Logout failed' });
+      }
+      // Clear the session cookie (default name used by express-session)
+      res.clearCookie('connect.sid');
+      res.json({ ok: true });
+    });
   });
 
   // ---- Pending chats list ----
@@ -138,6 +146,20 @@ function startDashboard({ sock, sessions, saveSessions, notifyClaimed, registerP
   // ---- Message history for one chat ----
   app.get('/api/chat/:chatId/messages', requireLogin, (req, res) => {
     res.json(getMessages(req.params.chatId));
+  });
+
+  function findResponder(username) {
+    return RESPONDERS.find((r) => r.username === username);
+  }
+
+  app.get('/api/me', requireLogin, (req, res) => {
+    const responder = findResponder(req.session.username);
+    if (!responder) return res.status(401).json({ error: 'Not logged in' });
+    res.json({
+      username: responder.username,
+      displayName: responder.displayName,
+      avatar: responder.avatar,
+    });
   });
 
   // ---- Send a text and/or file message to a customer ----
