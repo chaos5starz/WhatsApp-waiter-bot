@@ -56,7 +56,7 @@
   html, body {
     height: 100%;
     font-family: var(--font);
-    background: var(--bg-page);
+    background: linear-gradient(180deg, var(--navy-faint) 0%, var(--teal-light) 100%);
     color: var(--gray-800);
     -webkit-font-smoothing: antialiased;
     overflow: hidden;
@@ -78,11 +78,11 @@
   #sidebar {
     width: 300px;
     min-width: 260px;
-    background: var(--bg-surface);
+    background: linear-gradient(180deg, var(--teal), var(--teal-dark));
     display: flex;
     flex-direction: column;
-    border-right: 1px solid var(--border);
-    box-shadow: 2px 0 16px rgba(0,0,0,0.05);
+    border-right: none;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.12);
     animation: sidebarIn 0.4s ease-out both;
   }
 
@@ -93,13 +93,12 @@
 
   /* ── Sidebar Header ── */
   #sidebar-header {
-    padding: 0 16px;
-    height: 64px;
-    background: var(--white);
-    border-bottom: 1px solid var(--border);
+    padding: 8px 14px;
+    background: rgba(255,255,255,0.14);
+    border: 1px solid rgba(255,255,255,0.35);
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     flex-shrink: 0;
   }
 
@@ -122,19 +121,19 @@
   .sidebar-title {
     font-size: 14px;
     font-weight: 700;
-    color: var(--navy);
+    color: var(--white);
     letter-spacing: -0.01em;
   }
 
   .sidebar-subtitle {
     font-size: 11px;
-    color: var(--gray-400);
+    color: rgba(255,255,255,0.75);
     font-weight: 400;
   }
 
   .pending-badge {
     margin-left: auto;
-    background: var(--teal);
+    background: var(--navy);
     color: var(--white);
     font-size: 11px;
     font-weight: 700;
@@ -143,6 +142,91 @@
     min-width: 22px;
     text-align: center;
     transition: transform var(--transition);
+  }
+
+  .agent-profile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    border: none;
+    margin-left: 0;
+  }
+
+  .agent-photo {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    min-height: 42px;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.12);
+  }
+
+  .agent-photo img,
+  .agent-photo .avatar {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+  }
+
+  .agent-photo .avatar {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--white);
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .agent-photo img {
+    object-fit: cover;
+  }
+
+  .agent-details {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .agent-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--white);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .agent-username {
+    font-size: 11px;
+    color: rgba(255,255,255,0.75);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #logout-btn {
+    background: var(--white);
+    border: 1px solid rgba(0,0,0,0.08);
+    color: var(--navy);
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background var(--transition), transform var(--transition), border-color var(--transition);
+    white-space: nowrap;
+  }
+
+  #logout-btn:hover {
+    background: #f4f6f9;
+    border-color: rgba(0,0,0,0.12);
   }
 
   .pending-badge.bump {
@@ -161,7 +245,7 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: var(--gray-400);
+    color: rgba(255,255,255,0.72);
     padding: 14px 18px 6px;
   }
 
@@ -184,6 +268,7 @@
     transition: background var(--transition), transform var(--transition);
     position: relative;
     animation: itemIn 0.35s ease-out both;
+    background: rgba(255,255,255,0.12);
   }
 
   @keyframes itemIn {
@@ -191,8 +276,8 @@
     to   { opacity: 1; transform: translateY(0); }
   }
 
-  .pending-item:hover { background: var(--teal-light); transform: translateX(2px); }
-  .pending-item.active { background: var(--teal-light); }
+  .pending-item:hover { background: rgba(255,255,255,0.22); transform: translateX(2px); }
+  .pending-item.active { background: rgba(255,255,255,0.24); }
 
   .pending-item.active::before {
     content: '';
@@ -256,14 +341,14 @@
   .pending-info .name {
     font-weight: 600;
     font-size: 13.5px;
-    color: var(--gray-800);
+    color: var(--white);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
   .pending-info .type {
     font-size: 12px;
-    color: var(--gray-400);
+    color: rgba(255,255,255,0.72);
     margin-top: 2px;
     white-space: nowrap;
     overflow: hidden;
@@ -274,9 +359,9 @@
   .live-dot {
     width: 9px; height: 9px;
     border-radius: 50%;
-    background: var(--teal);
+    background: var(--white);
     flex-shrink: 0;
-    box-shadow: 0 0 0 2px var(--teal-light);
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.35);
     animation: livePulse 2s ease-in-out infinite;
   }
 
@@ -293,7 +378,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    background: var(--bg-page);
+    background: linear-gradient(180deg, rgba(255,255,255,0.72), var(--teal-light));
   }
 
   /* ── Empty State ── */
@@ -305,6 +390,7 @@
     justify-content: center;
     gap: 14px;
     animation: fadeIn 0.4s ease-out;
+    color: var(--navy);
   }
 
   @keyframes fadeIn {
@@ -335,20 +421,20 @@
   .empty-title {
     font-size: 17px;
     font-weight: 700;
-    color: var(--gray-700);
+    color: var(--navy);
   }
 
   .empty-subtitle {
     font-size: 13px;
-    color: var(--gray-400);
+    color: var(--gray-500);
   }
 
   /* ── Chat Header ── */
   #chat-header {
     height: 64px;
     padding: 0 24px;
-    background: var(--white);
-    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,0.92);
+    border-bottom: 1px solid rgba(46,207,178,0.24);
     display: flex;
     align-items: center;
     gap: 14px;
@@ -426,7 +512,7 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
-    background: var(--bg-page);
+    background: transparent;
     animation: fadeIn 0.3s ease-out;
   }
 
@@ -451,23 +537,23 @@
   .msg:hover { box-shadow: var(--shadow-md); }
 
   .msg.customer {
-    background: var(--white);
-    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.92);
+    border: 1px solid rgba(255,255,255,0.75);
     align-self: flex-start;
     border-bottom-left-radius: 4px;
   }
 
   .msg.bot {
-    background: var(--navy-faint);
-    border: 1px solid #dde3f5;
+    background: rgba(27,61,140,0.08);
+    border: 1px solid rgba(27,61,140,0.14);
     border-left: 3px solid var(--navy-light);
     align-self: flex-start;
     border-bottom-left-radius: 4px;
   }
 
   .msg.agent {
-    background: var(--teal-light);
-    border: 1px solid var(--teal-mid);
+    background: linear-gradient(135deg, rgba(46,207,178,0.18), rgba(46,207,178,0.28));
+    border: 1px solid rgba(46,207,178,0.35);
     align-self: flex-end;
     border-bottom-right-radius: 4px;
   }
@@ -525,8 +611,8 @@
 
   /* ── Composer ── */
   #composer {
-    background: var(--white);
-    border-top: 1px solid var(--border);
+    background: rgba(255,255,255,0.92);
+    border-top: 1px solid rgba(46,207,178,0.22);
     padding: 12px 16px;
     display: flex;
     flex-direction: column;
@@ -554,8 +640,8 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    background: var(--bg-page);
-    border: 1.5px solid var(--border);
+    background: rgba(255,255,255,0.8);
+    border: 1.5px solid rgba(46,207,178,0.24);
     border-radius: var(--radius-full);
     padding: 4px 4px 4px 16px;
     transition: border-color 0.22s, box-shadow 0.22s;
@@ -666,8 +752,8 @@
     position: fixed;
     bottom: 80px;
     right: 24px;
-    background: var(--white);
-    border: 1px solid var(--teal-mid);
+    background: rgba(255,255,255,0.95);
+    border: 1px solid rgba(46,207,178,0.35);
     border-left: 4px solid var(--teal);
     color: var(--gray-800);
     font-size: 13px;
@@ -696,13 +782,14 @@
   <!-- ═══════ SIDEBAR ═══════ -->
   <div id="sidebar">
     <div id="sidebar-header">
-      <div class="sidebar-logo">
-        <img src="/logo.jpeg" alt="Al-Furqan Logo" />
+      <div class="agent-profile" id="agent-profile">
+        <div class="agent-photo" id="agent-photo"></div>
+        <div class="agent-details">
+          <div class="agent-name" id="agent-name"></div>
+          <div class="agent-username" id="agent-username"></div>
+        </div>
       </div>
-      <div>
-        <div class="sidebar-title">Al-Furqan</div>
-        <div class="sidebar-subtitle">Tourism &amp; Travel</div>
-      </div>
+      <button id="logout-btn" type="button">Logout</button>
       <div class="pending-badge" id="pending-count">0</div>
     </div>
 
@@ -774,7 +861,53 @@ function showToast(msg) {
 async function checkAuthAndLoad() {
   const res = await fetch('/api/pending');
   if (res.status === 401) { window.location.href = '/login.html'; return; }
+  await loadAgentProfile();
+  attachLogoutHandler();
   loadPending();
+}
+
+function attachLogoutHandler() {
+  const btn = document.getElementById('logout-btn');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    try {
+      await fetch('/api/logout', { method: 'POST' });
+    } catch (err) {
+      console.error('Logout failed', err);
+    }
+    window.location.href = '/login.html';
+  });
+}
+
+async function loadAgentProfile() {
+  const res = await fetch('/api/me');
+  if (!res.ok) return;
+  const me = await res.json();
+  const nameEl = document.getElementById('agent-name');
+  const usernameEl = document.getElementById('agent-username');
+  const photoEl = document.getElementById('agent-photo');
+  if (nameEl) nameEl.textContent = me.username || '';
+  if (usernameEl) {
+    if (me.displayName && me.displayName !== me.username) {
+      usernameEl.textContent = me.displayName;
+      usernameEl.style.display = 'block';
+    } else {
+      usernameEl.textContent = '';
+      usernameEl.style.display = 'none';
+    }
+  }
+  if (photoEl) {
+    photoEl.innerHTML = '';
+    if (me.avatar) {
+      photoEl.innerHTML = `<img src="${escapeHtml(me.avatar)}" alt="${escapeHtml(me.displayName || me.username)}" />`;
+    } else {
+      const initialsEl = document.createElement('div');
+      initialsEl.className = 'avatar';
+      initialsEl.textContent = initials(me.username);
+      photoEl.appendChild(initialsEl);
+    }
+  }
 }
 
 async function loadPending() {
