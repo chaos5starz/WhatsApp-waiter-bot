@@ -2,55 +2,735 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Responder Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Responder Dashboard — Al-Furqan Tourism</title>
+<meta name="description" content="Al-Furqan Tourism WhatsApp responder dashboard." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 <style>
-  * { box-sizing: border-box; }
-  body { font-family: Arial, sans-serif; margin: 0; height: 100vh; display: flex; background: #111b21; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  #sidebar { width: 300px; background: #202c33; overflow-y: auto; border-right: 1px solid #2a3942; }
-  #sidebar h3 { color: #e9edef; padding: 16px; margin: 0; border-bottom: 1px solid #2a3942; }
-  .pending-item { padding: 14px 16px; border-bottom: 1px solid #2a3942; cursor: pointer; color: #e9edef; }
-  .pending-item:hover { background: #2a3942; }
-  .pending-item.active { background: #2a3942; }
-  .pending-item .name { font-weight: bold; }
-  .pending-item .type { font-size: 13px; color: #8696a0; }
+  :root {
+    --teal:        #2ECFB2;
+    --teal-dark:   #1aad96;
+    --teal-darker: #0f9480;
+    --teal-light:  #e6faf7;
+    --teal-mid:    #b8f0e6;
+    --navy:        #1B3D8C;
+    --navy-light:  #2a52b5;
+    --navy-faint:  #eef1fa;
 
-  #main { flex: 1; display: flex; flex-direction: column; }
-  #chat-header { padding: 14px 20px; background: #202c33; color: #e9edef; border-bottom: 1px solid #2a3942; }
-  #resolve-btn { float: right; background: #00a884; border: none; color: white; padding: 6px 14px;
-                 border-radius: 4px; cursor: pointer; }
+    --white:       #ffffff;
+    --bg-page:     #f4f6f9;
+    --bg-surface:  #ffffff;
+    --bg-hover:    #f0f7f6;
 
-  #messages { flex: 1; padding: 20px; overflow-y: auto; background: #0b141a; }
-  .msg { max-width: 60%; margin-bottom: 10px; padding: 8px 12px; border-radius: 8px; color: #e9edef;
-         clear: both; }
-  .msg.customer { background: #202c33; float: left; }
-  .msg.bot { background: #1f2c34; float: left; border-left: 3px solid #53bdeb; }
-  .msg.agent { background: #005c4b; float: right; }
-  .msg img { max-width: 100%; border-radius: 4px; margin-top: 6px; }
-  .msg audio { margin-top: 6px; max-width: 100%; }
-  .msg a { color: #53bdeb; }
-  .msg .meta { font-size: 11px; color: #8696a0; margin-top: 4px; }
+    --gray-100:    #f0f2f5;
+    --gray-200:    #e4e7ed;
+    --gray-300:    #cdd1da;
+    --gray-400:    #9aa1b1;
+    --gray-500:    #6b7280;
+    --gray-700:    #374151;
+    --gray-800:    #1f2937;
 
-  #composer { display: flex; flex-direction: column; padding: 12px; background: #202c33; gap: 6px; }
-  #composer-row { display: flex; gap: 8px; align-items: center; }
-  #text-input { flex: 1; padding: 10px; border-radius: 20px; border: none; }
-  #send-btn, #file-label { background: #00a884; color: white; border: none; padding: 10px 16px;
-                            border-radius: 20px; cursor: pointer; }
-  #send-btn:disabled, #file-label.disabled { opacity: 0.6; cursor: not-allowed; }
+    --border:      #e4e7ed;
+    --border-focus:#2ECFB2;
+
+    --msg-customer-bg: #f0f2f5;
+    --msg-agent-bg:    #e6faf7;
+    --msg-bot-bg:      #eef1fa;
+
+    --shadow-sm:   0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md:   0 4px 16px rgba(0,0,0,0.08);
+    --shadow-lg:   0 8px 32px rgba(0,0,0,0.10);
+
+    --font: 'Inter', system-ui, -apple-system, sans-serif;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 18px;
+    --radius-full: 9999px;
+    --transition: 200ms cubic-bezier(0.4,0,0.2,1);
+  }
+
+  html, body {
+    height: 100%;
+    font-family: var(--font);
+    background: var(--bg-page);
+    color: var(--gray-800);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  body { display: flex; height: 100vh; }
+
+  /* ═══════════════════════════════════════════
+     SCROLLBARS
+  ═══════════════════════════════════════════ */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--gray-300); border-radius: var(--radius-full); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--gray-400); }
+
+  /* ═══════════════════════════════════════════
+     SIDEBAR
+  ═══════════════════════════════════════════ */
+  #sidebar {
+    width: 300px;
+    min-width: 260px;
+    background: var(--bg-surface);
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border);
+    box-shadow: 2px 0 16px rgba(0,0,0,0.05);
+    animation: sidebarIn 0.4s ease-out both;
+  }
+
+  @keyframes sidebarIn {
+    from { transform: translateX(-16px); opacity: 0; }
+    to   { transform: translateX(0);     opacity: 1; }
+  }
+
+  /* ── Sidebar Header ── */
+  #sidebar-header {
+    padding: 0 16px;
+    height: 64px;
+    background: var(--white);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  .sidebar-logo {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 2px solid var(--teal-mid);
+    flex-shrink: 0;
+    box-shadow: 0 0 0 3px var(--teal-light);
+  }
+
+  .sidebar-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .sidebar-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--navy);
+    letter-spacing: -0.01em;
+  }
+
+  .sidebar-subtitle {
+    font-size: 11px;
+    color: var(--gray-400);
+    font-weight: 400;
+  }
+
+  .pending-badge {
+    margin-left: auto;
+    background: var(--teal);
+    color: var(--white);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    min-width: 22px;
+    text-align: center;
+    transition: transform var(--transition);
+  }
+
+  .pending-badge.bump {
+    animation: bump 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  }
+
+  @keyframes bump {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.35); }
+    100% { transform: scale(1); }
+  }
+
+  /* ── Section label ── */
+  .sidebar-section-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--gray-400);
+    padding: 14px 18px 6px;
+  }
+
+  /* ── Pending list ── */
+  #pending-list {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 8px;
+  }
+
+  /* ── Pending Item ── */
+  .pending-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-radius: var(--radius-sm);
+    margin: 2px 8px;
+    transition: background var(--transition), transform var(--transition);
+    position: relative;
+    animation: itemIn 0.35s ease-out both;
+  }
+
+  @keyframes itemIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .pending-item:hover { background: var(--teal-light); transform: translateX(2px); }
+  .pending-item.active { background: var(--teal-light); }
+
+  .pending-item.active::before {
+    content: '';
+    position: absolute;
+    left: -8px; top: 25%; bottom: 25%;
+    width: 3px;
+    background: var(--teal);
+    border-radius: 0 var(--radius-full) var(--radius-full) 0;
+  }
+
+  /* SVG Avatar */
+  .avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--white);
+    position: relative;
+    overflow: hidden;
+    transition: box-shadow var(--transition);
+  }
+
+  /* Generates unique colors per initial letter */
+  .avatar[data-initial="A"] { background: linear-gradient(135deg,#2ECFB2,#1aad96); }
+  .avatar[data-initial="B"] { background: linear-gradient(135deg,#6366f1,#4f46e5); }
+  .avatar[data-initial="C"] { background: linear-gradient(135deg,#f59e0b,#d97706); }
+  .avatar[data-initial="D"] { background: linear-gradient(135deg,#10b981,#059669); }
+  .avatar[data-initial="E"] { background: linear-gradient(135deg,#ef4444,#dc2626); }
+  .avatar[data-initial="F"] { background: linear-gradient(135deg,#8b5cf6,#7c3aed); }
+  .avatar[data-initial="G"] { background: linear-gradient(135deg,#3b82f6,#2563eb); }
+  .avatar[data-initial="H"] { background: linear-gradient(135deg,#ec4899,#db2777); }
+  .avatar[data-initial="I"] { background: linear-gradient(135deg,#14b8a6,#0d9488); }
+  .avatar[data-initial="J"] { background: linear-gradient(135deg,#f97316,#ea580c); }
+  .avatar[data-initial="K"] { background: linear-gradient(135deg,#84cc16,#65a30d); }
+  .avatar[data-initial="L"] { background: linear-gradient(135deg,#06b6d4,#0891b2); }
+  .avatar[data-initial="M"] { background: linear-gradient(135deg,#1B3D8C,#2a52b5); }
+  .avatar[data-initial="N"] { background: linear-gradient(135deg,#a855f7,#9333ea); }
+  .avatar[data-initial="O"] { background: linear-gradient(135deg,#f43f5e,#e11d48); }
+  .avatar[data-initial="P"] { background: linear-gradient(135deg,#0ea5e9,#0284c7); }
+  .avatar[data-initial="Q"] { background: linear-gradient(135deg,#2ECFB2,#0f9480); }
+  .avatar[data-initial="R"] { background: linear-gradient(135deg,#d946ef,#c026d3); }
+  .avatar[data-initial="S"] { background: linear-gradient(135deg,#f59e0b,#b45309); }
+  .avatar[data-initial="T"] { background: linear-gradient(135deg,#1B3D8C,#1e3a8a); }
+  .avatar[data-initial="U"] { background: linear-gradient(135deg,#10b981,#047857); }
+  .avatar[data-initial="V"] { background: linear-gradient(135deg,#6366f1,#7c3aed); }
+  .avatar[data-initial="W"] { background: linear-gradient(135deg,#ef4444,#b91c1c); }
+  .avatar[data-initial="X"] { background: linear-gradient(135deg,#64748b,#475569); }
+  .avatar[data-initial="Y"] { background: linear-gradient(135deg,#2ECFB2,#1aad96); }
+  .avatar[data-initial="Z"] { background: linear-gradient(135deg,#8b5cf6,#6d28d9); }
+  .avatar[data-initial="?"] { background: linear-gradient(135deg,#9ca3af,#6b7280); }
+
+  .pending-item:hover .avatar { box-shadow: 0 0 0 3px var(--teal-mid); }
+  .pending-item.active .avatar { box-shadow: 0 0 0 3px var(--teal); }
+
+  .pending-info { flex: 1; min-width: 0; }
+  .pending-info .name {
+    font-weight: 600;
+    font-size: 13.5px;
+    color: var(--gray-800);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .pending-info .type {
+    font-size: 12px;
+    color: var(--gray-400);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Live indicator */
+  .live-dot {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--teal);
+    flex-shrink: 0;
+    box-shadow: 0 0 0 2px var(--teal-light);
+    animation: livePulse 2s ease-in-out infinite;
+  }
+
+  @keyframes livePulse {
+    0%, 100% { transform: scale(1);   opacity: 1; }
+    50%       { transform: scale(0.7); opacity: 0.6; }
+  }
+
+  /* ═══════════════════════════════════════════
+     MAIN AREA
+  ═══════════════════════════════════════════ */
+  #main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg-page);
+  }
+
+  /* ── Empty State ── */
+  #empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    animation: fadeIn 0.4s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.98); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  .empty-illustration {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--teal-light), var(--navy-faint));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--teal-mid);
+    box-shadow: 0 0 0 8px rgba(46,207,178,0.08);
+    animation: floatUpDown 3.5s ease-in-out infinite;
+  }
+
+  @keyframes floatUpDown {
+    0%, 100% { transform: translateY(0); }
+    50%       { transform: translateY(-10px); }
+  }
+
+  .empty-illustration svg { color: var(--teal-dark); }
+
+  .empty-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--gray-700);
+  }
+
+  .empty-subtitle {
+    font-size: 13px;
+    color: var(--gray-400);
+  }
+
+  /* ── Chat Header ── */
+  #chat-header {
+    height: 64px;
+    padding: 0 24px;
+    background: var(--white);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: var(--shadow-sm);
+    animation: slideDown 0.3s ease-out;
+    flex-shrink: 0;
+  }
+
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .header-avatar { width: 38px; height: 38px; }
+
+  .header-info { flex: 1; min-width: 0; }
+
+  .header-name {
+    font-weight: 700;
+    font-size: 14.5px;
+    color: var(--navy);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .header-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--gray-400);
+    margin-top: 1px;
+  }
+
+  .header-meta .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--teal);
+    animation: livePulse 1.8s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+
+  #resolve-btn {
+    background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+    border: none;
+    color: var(--white);
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 9px 20px;
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    transition: transform var(--transition), box-shadow var(--transition), opacity var(--transition);
+    box-shadow: 0 3px 12px rgba(46,207,178,0.35);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  #resolve-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(46,207,178,0.45);
+  }
+
+  #resolve-btn:active { transform: translateY(0); }
+
+  /* ── Messages ── */
+  #messages {
+    flex: 1;
+    padding: 24px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: var(--bg-page);
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  .msg {
+    max-width: 65%;
+    padding: 10px 14px;
+    border-radius: var(--radius-lg);
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--gray-800);
+    box-shadow: var(--shadow-sm);
+    animation: msgIn 0.28s ease-out;
+    word-wrap: break-word;
+    transition: box-shadow var(--transition);
+  }
+
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0)   scale(1); }
+  }
+
+  .msg:hover { box-shadow: var(--shadow-md); }
+
+  .msg.customer {
+    background: var(--white);
+    border: 1px solid var(--border);
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+  }
+
+  .msg.bot {
+    background: var(--navy-faint);
+    border: 1px solid #dde3f5;
+    border-left: 3px solid var(--navy-light);
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+  }
+
+  .msg.agent {
+    background: var(--teal-light);
+    border: 1px solid var(--teal-mid);
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+  }
+
+  .msg img {
+    max-width: 100%;
+    border-radius: var(--radius-sm);
+    margin-top: 8px;
+    display: block;
+    border: 1px solid var(--border);
+  }
+
+  .msg audio {
+    margin-top: 8px;
+    max-width: 100%;
+    width: 100%;
+    border-radius: var(--radius-full);
+  }
+
+  .msg a {
+    color: var(--navy-light);
+    text-decoration: none;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: color var(--transition);
+  }
+  .msg a:hover { color: var(--teal-dark); }
+
+  .msg .meta {
+    font-size: 11px;
+    color: var(--gray-400);
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .msg.agent .meta { justify-content: flex-end; }
+
+  .sender-chip {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: var(--radius-full);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .msg.customer .sender-chip { background: var(--gray-100); color: var(--gray-500); }
+  .msg.bot      .sender-chip { background: var(--navy-faint); color: var(--navy); }
+  .msg.agent    .sender-chip { background: var(--teal-light); color: var(--teal-darker); }
+
+  /* ── Composer ── */
+  #composer {
+    background: var(--white);
+    border-top: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    animation: slideUp 0.3s ease-out;
+    flex-shrink: 0;
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  #file-selected-name {
+    font-size: 12px;
+    color: var(--teal-dark);
+    font-weight: 500;
+    min-height: 14px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  #composer-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-page);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-full);
+    padding: 4px 4px 4px 16px;
+    transition: border-color 0.22s, box-shadow 0.22s;
+  }
+
+  #composer-row:focus-within {
+    border-color: var(--teal);
+    box-shadow: 0 0 0 3px rgba(46,207,178,0.15);
+  }
+
   #file-input { display: none; }
-  #file-selected-name { font-size: 12px; color: #8696a0; padding-left: 4px; min-height: 16px; }
 
-  #empty-state { flex: 1; display: flex; align-items: center; justify-content: center; color: #8696a0; }
+  #file-label {
+    background: transparent;
+    border: none;
+    color: var(--gray-400);
+    cursor: pointer;
+    padding: 7px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color var(--transition), background var(--transition), transform var(--transition);
+    flex-shrink: 0;
+  }
+
+  #file-label:hover {
+    color: var(--teal-dark);
+    background: var(--teal-light);
+    transform: scale(1.12);
+  }
+
+  #file-label.disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  #text-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--gray-800);
+    font-family: var(--font);
+    font-size: 14px;
+    padding: 8px 0;
+    caret-color: var(--teal);
+  }
+
+  #text-input::placeholder { color: var(--gray-400); }
+
+  #send-btn {
+    background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+    border: none;
+    color: var(--white);
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 9px 20px;
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    transition: transform var(--transition), box-shadow var(--transition), opacity var(--transition);
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(46,207,178,0.30);
+  }
+
+  #send-btn:hover:not(:disabled) {
+    transform: scale(1.05);
+    box-shadow: 0 4px 16px rgba(46,207,178,0.45);
+  }
+
+  #send-btn:active:not(:disabled) { transform: scale(0.97); }
+  #send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .send-spinner {
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: none;
+  }
+
+  #send-btn.sending .send-spinner { display: block; }
+  #send-btn.sending .send-text    { display: none; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── File chip ── */
+  .file-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--teal-light);
+    border: 1px solid var(--teal-mid);
+    color: var(--teal-darker);
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: var(--radius-full);
+    font-weight: 600;
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  /* ═══════════════════════════════════════════
+     TOAST
+  ═══════════════════════════════════════════ */
+  #toast {
+    position: fixed;
+    bottom: 80px;
+    right: 24px;
+    background: var(--white);
+    border: 1px solid var(--teal-mid);
+    border-left: 4px solid var(--teal);
+    color: var(--gray-800);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 14px 18px;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transform: translateY(16px);
+    opacity: 0;
+    transition: opacity 0.25s, transform 0.25s;
+    pointer-events: none;
+    max-width: 300px;
+  }
+
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  #toast svg { color: var(--teal); flex-shrink: 0; }
 </style>
 </head>
 <body>
+
+  <!-- ═══════ SIDEBAR ═══════ -->
   <div id="sidebar">
-    <h3>Pending Requests</h3>
+    <div id="sidebar-header">
+      <div class="sidebar-logo">
+        <img src="/logo.png" alt="Al-Furqan Logo" />
+      </div>
+      <div>
+        <div class="sidebar-title">Al-Furqan</div>
+        <div class="sidebar-subtitle">Tourism &amp; Travel</div>
+      </div>
+      <div class="pending-badge" id="pending-count">0</div>
+    </div>
+
+    <div class="sidebar-section-label">Pending Requests</div>
     <div id="pending-list"></div>
   </div>
 
+  <!-- ═══════ MAIN ═══════ -->
   <div id="main">
-    <div id="empty-state">Select a chat from the left</div>
+    <div id="empty-state">
+      <div class="empty-illustration">
+        <!-- Chat bubble SVG -->
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+      </div>
+      <div class="empty-title">No chat selected</div>
+      <div class="empty-subtitle">Pick a conversation from the sidebar to start responding</div>
+    </div>
+  </div>
+
+  <!-- ═══════ TOAST ═══════ -->
+  <div id="toast">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+      <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+    </svg>
+    <span id="toast-msg"></span>
   </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -60,34 +740,40 @@ let currentChatId = null;
 const renderedMessageIds = new Set();
 const socket = io();
 
-// Escapes HTML-significant characters so customer-typed text (name, inquiry
-// details, chat messages) can never be interpreted as markup by the browser
-// when interpolated into innerHTML templates below. Uses the browser's own
-// textContent -> innerHTML round-trip rather than a manual regex, so it
-// stays correct even for edge cases (quotes, ampersands, etc.).
+// ── Helpers ────────────────────────────────────────────────
+
 function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str == null ? '' : String(str);
-  return div.innerHTML;
+  const d = document.createElement('div');
+  d.textContent = str == null ? '' : String(str);
+  return d.innerHTML;
 }
 
-// mediaFile is built server-side from things like the customer's original
-// filename or a detected extension, and can contain spaces or other
-// characters that aren't safe to drop straight into a URL (e.g. a raw
-// space breaks the src/href entirely, making the browser fail to load it
-// silently - previously the most likely cause of media looking "stuck").
-// encodeURIComponent() here pairs with the backend's own path.basename()
-// safety check in server.js, which decodes req.params.filename normally.
-function mediaUrl(mediaFile) {
-  return `/media/${encodeURIComponent(mediaFile)}`;
+function mediaUrl(f) { return `/media/${encodeURIComponent(f)}`; }
+
+function initials(name) {
+  if (!name) return '?';
+  return name.trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
 }
+
+function avatarHtml(name, extraClass = '') {
+  const ini  = initials(name);
+  const key  = ini[0] || '?';
+  return `<div class="avatar ${extraClass}" data-initial="${key}" title="${escapeHtml(name)}">${escapeHtml(ini)}</div>`;
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// ── Auth & Load ────────────────────────────────────────────
 
 async function checkAuthAndLoad() {
   const res = await fetch('/api/pending');
-  if (res.status === 401) {
-    window.location.href = '/login.html';
-    return;
-  }
+  if (res.status === 401) { window.location.href = '/login.html'; return; }
   loadPending();
 }
 
@@ -95,19 +781,39 @@ async function loadPending() {
   const res = await fetch('/api/pending');
   const pending = await res.json();
   const list = document.getElementById('pending-list');
+
+  const badge = document.getElementById('pending-count');
+  const prev = parseInt(badge.textContent, 10) || 0;
+  badge.textContent = pending.length;
+  if (pending.length !== prev) {
+    badge.classList.remove('bump');
+    void badge.offsetWidth;
+    badge.classList.add('bump');
+  }
+
   list.innerHTML = '';
-  pending.forEach((p) => {
+  pending.forEach((p, i) => {
     const div = document.createElement('div');
     div.className = 'pending-item' + (p.chatId === currentChatId ? ' active' : '');
-    div.innerHTML = `<div class="name">${escapeHtml(p.data.name) || 'Unknown'}</div>
-                      <div class="type">${escapeHtml(p.data.inquiryType)}</div>`;
+    div.style.animationDelay = `${i * 35}ms`;
+    const name = p.data.name || 'Unknown';
+    div.innerHTML = `
+      ${avatarHtml(name)}
+      <div class="pending-info">
+        <div class="name">${escapeHtml(name)}</div>
+        <div class="type">${escapeHtml(p.data.inquiryType || '')}</div>
+      </div>
+      <div class="live-dot"></div>
+    `;
     div.onclick = () => openChat(p.chatId, p.data);
     list.appendChild(div);
   });
 }
 
+// ── Render Message ─────────────────────────────────────────
+
 function renderMessage(entry) {
-   if (entry.id) {
+  if (entry.id) {
     if (renderedMessageIds.has(entry.id)) return;
     renderedMessageIds.add(entry.id);
   }
@@ -115,57 +821,98 @@ function renderMessage(entry) {
   const div = document.createElement('div');
   div.className = 'msg ' + entry.sender;
 
+  const chip = `<span class="sender-chip">${escapeHtml(entry.sender)}</span>`;
   let content = '';
+
   if (entry.type === 'image' && entry.mediaFile) {
-    content += `<img src="${mediaUrl(entry.mediaFile)}" />`;
+    content += `<img src="${mediaUrl(entry.mediaFile)}" alt="Image" />`;
   } else if (entry.type === 'voice' && entry.mediaFile) {
-    // Voice notes get an inline player so the agent can actually listen,
-    // instead of a generic "Download file" link that gave no indication
-    // it was audio at all.
     content += `<audio controls src="${mediaUrl(entry.mediaFile)}"></audio>`;
   } else if (entry.type === 'document' && entry.mediaFile) {
-    content += `<a href="${mediaUrl(entry.mediaFile)}" target="_blank">📄 Download file</a>`;
+    content += `<a href="${mediaUrl(entry.mediaFile)}" target="_blank">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+      </svg>
+      Download file
+    </a>`;
   }
+
   if (entry.text) content += `<div>${escapeHtml(entry.text)}</div>`;
-  content += `<div class="meta">${entry.sender} · ${new Date(entry.timestamp).toLocaleTimeString()}</div>`;
+  content += `<div class="meta">${chip} ${new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>`;
 
   div.innerHTML = content;
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
 }
 
+// ── Open Chat ──────────────────────────────────────────────
+
 async function openChat(chatId, data) {
   renderedMessageIds.clear();
   currentChatId = chatId;
-  loadPending(); // refresh sidebar to highlight active chat
+  loadPending();
+
+  const name = data.name || 'Unknown';
 
   document.getElementById('main').innerHTML = `
     <div id="chat-header">
-      <button id="resolve-btn" onclick="resolveChat()">Mark Resolved</button>
-      <strong>${escapeHtml(data.name) || 'Unknown'}</strong> — ${escapeHtml(data.inquiryType)}
+      ${avatarHtml(name, 'header-avatar')}
+      <div class="header-info">
+        <div class="header-name">${escapeHtml(name)}</div>
+        <div class="header-meta">
+          <span class="status-dot"></span>
+          ${escapeHtml(data.inquiryType || 'Active')}
+        </div>
+      </div>
+      <button id="resolve-btn" onclick="resolveChat()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        Mark Resolved
+      </button>
     </div>
     <div id="messages"></div>
     <div id="composer">
       <div id="file-selected-name"></div>
       <div id="composer-row">
-        <label id="file-label" for="file-input">📎</label>
+        <label id="file-label" for="file-input" title="Attach file">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+          </svg>
+        </label>
         <input type="file" id="file-input" />
-        <input type="text" id="text-input" placeholder="Type a message..." />
-        <button id="send-btn" onclick="sendMessage()">Send</button>
+        <input type="text" id="text-input" placeholder="Type a message…" autocomplete="off" />
+        <button id="send-btn" onclick="sendMessage()">
+          <div class="send-spinner"></div>
+          <span class="send-text" style="display:flex;align-items:center;gap:6px;">
+            Send
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+          </span>
+        </button>
       </div>
     </div>
   `;
 
   document.getElementById('text-input').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') sendMessage();
+    if (e.key === 'Enter' && !e.shiftKey) sendMessage();
   });
 
-  // Shows which file is currently attached, so choosing a file gives
-  // visible feedback instead of looking like nothing happened until Send
-  // is clicked.
   document.getElementById('file-input').addEventListener('change', (e) => {
     const file = e.target.files[0];
-    document.getElementById('file-selected-name').textContent = file ? `📎 ${file.name}` : '';
+    const label = document.getElementById('file-selected-name');
+    if (file) {
+      label.innerHTML = `<span class="file-chip">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+        </svg>
+        ${escapeHtml(file.name)}
+      </span>`;
+    } else {
+      label.innerHTML = '';
+    }
   });
 
   const res = await fetch(`/api/chat/${encodeURIComponent(chatId)}/messages`);
@@ -173,29 +920,24 @@ async function openChat(chatId, data) {
   messages.forEach(renderMessage);
 
   socket.emit('join_chat', chatId);
+  document.getElementById('text-input').focus();
 }
+
+// ── Send Message ───────────────────────────────────────────
 
 async function sendMessage() {
   const textInput = document.getElementById('text-input');
   const fileInput = document.getElementById('file-input');
-  const sendBtn = document.getElementById('send-btn');
+  const sendBtn   = document.getElementById('send-btn');
   const fileLabel = document.getElementById('file-label');
   const text = textInput.value.trim();
   const file = fileInput.files[0];
 
   if (!text && !file) return;
 
-  // Disable the composer for the duration of the send - sending a file
-  // (especially a larger one) can take a few seconds, since it has to be
-  // encoded and pushed through the WhatsApp session. Without this, a
-  // second click while the first send was still in flight fired a genuine
-  // duplicate send, which is likely what made file sends feel "weirder and
-  // slower" than plain text - two uploads competing for the same request,
-  // not one just being slow.
   sendBtn.disabled = true;
+  sendBtn.classList.add('sending');
   fileLabel.classList.add('disabled');
-  const originalSendLabel = sendBtn.textContent;
-  sendBtn.textContent = 'Sending...';
 
   try {
     const formData = new FormData();
@@ -209,12 +951,19 @@ async function sendMessage() {
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      alert(body.error || 'Failed to send message.');
+      showToast(body.error || 'Failed to send message.');
       if (res.status === 409) {
-        // Chat is no longer active (auto-reset, resolved elsewhere, etc.) -
-        // bail out of this chat view instead of leaving a dead composer open.
         currentChatId = null;
-        document.getElementById('main').innerHTML = '<div id="empty-state">Select a chat from the left</div>';
+        document.getElementById('main').innerHTML = `
+          <div id="empty-state">
+            <div class="empty-illustration">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+            </div>
+            <div class="empty-title">No chat selected</div>
+            <div class="empty-subtitle">Pick a conversation from the sidebar to start responding</div>
+          </div>`;
         loadPending();
       }
       return;
@@ -223,14 +972,11 @@ async function sendMessage() {
     textInput.value = '';
     fileInput.value = '';
     const nameLabel = document.getElementById('file-selected-name');
-    if (nameLabel) nameLabel.textContent = '';
+    if (nameLabel) nameLabel.innerHTML = '';
   } finally {
-    // Re-enable even if currentChatId was cleared above (elements may
-    // already be gone in that case, hence the guards) or if the request
-    // failed outright.
     if (document.body.contains(sendBtn)) {
       sendBtn.disabled = false;
-      sendBtn.textContent = originalSendLabel;
+      sendBtn.classList.remove('sending');
     }
     if (document.body.contains(fileLabel)) {
       fileLabel.classList.remove('disabled');
@@ -238,21 +984,39 @@ async function sendMessage() {
   }
 }
 
+// ── Resolve Chat ───────────────────────────────────────────
+
 async function resolveChat() {
   await fetch(`/api/chat/${encodeURIComponent(currentChatId)}/resolve`, { method: 'POST' });
+  showToast('Chat resolved successfully!');
   currentChatId = null;
-  document.getElementById('main').innerHTML = '<div id="empty-state">Select a chat from the left</div>';
+  document.getElementById('main').innerHTML = `
+    <div id="empty-state">
+      <div class="empty-illustration">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+      </div>
+      <div class="empty-title">No chat selected</div>
+      <div class="empty-subtitle">Pick a conversation from the sidebar to start responding</div>
+    </div>`;
   loadPending();
 }
 
+// ── Socket ─────────────────────────────────────────────────
+
 socket.on('new_message', ({ chatId, entry }) => {
   if (chatId === currentChatId) renderMessage(entry);
+  else showToast(`New message from ${entry.sender || 'a customer'}`);
 });
 
 socket.on('pending_updated', loadPending);
 
+// ── Init ───────────────────────────────────────────────────
+
 checkAuthAndLoad();
-setInterval(loadPending, 15000); // fallback refresh every 15s in case a socket event is missed
+setInterval(loadPending, 15000);
+
 </script>
 </body>
 </html>
