@@ -411,19 +411,59 @@
   /* ═══════════════════════════════════════════════
      RESPONSIVE
   ═══════════════════════════════════════════════ */
-  @media (max-width: 720px) {
+  @media (max-width: 1024px) {
     body { flex-direction: column; overflow: auto; }
+    .brand-panel { width: 100%; padding: 32px 24px 24px; min-height: 240px; }
+    .brand-logo-wrap { width: 140px; height: 140px; }
+    .brand-tagline h2 { font-size: 20px; }
+    .brand-tagline p { font-size: 13px; }
+    .form-panel { padding: 32px 24px; }
+  }
 
-    .brand-panel {
-      width: 100%;
-      padding: 40px 24px 32px;
-      min-height: 280px;
-    }
-
-    .brand-logo-wrap { width: 150px; height: 150px; }
+  @media (max-width: 768px) {
+    body { flex-direction: column; overflow: auto; }
+    .brand-panel { width: 100%; padding: 24px 20px 20px; min-height: 200px; }
+    .brand-logo-wrap { width: 120px; height: 120px; }
+    .brand-tagline { margin-top: 20px; }
     .brand-tagline h2 { font-size: 18px; }
+    .brand-tagline p { font-size: 12px; line-height: 1.5; }
+    .brand-dots { margin-top: 20px; }
+    .form-panel { padding: 24px 20px; }
+    .form-inner { max-width: 100%; }
+    .form-header { margin-bottom: 24px; }
+    .form-header .welcome { font-size: 22px; }
+    .form-header .sub { font-size: 13px; }
+    .field { margin-bottom: 16px; }
+    .field label { font-size: 11px; }
+    .field input { font-size: 14px; padding: 11px 12px 11px 40px; }
+    #login-btn { font-size: 14px; padding: 12px; }
+    .form-footer { margin-top: 24px; font-size: 11px; }
+  }
 
-    .form-panel { padding: 40px 24px; }
+  @media (max-width: 480px) {
+    body { overflow: auto; }
+    .brand-panel { width: 100%; padding: 16px 16px 12px; min-height: 160px; }
+    .brand-panel::before { width: 300px; height: 300px; border-width: 50px; top: -100px; right: -100px; }
+    .brand-panel::after { width: 200px; height: 200px; border-width: 40px; bottom: -60px; left: -60px; }
+    .brand-logo-wrap { width: 100px; height: 100px; box-shadow: 0 12px 40px rgba(0,0,0,0.15), 0 0 0 8px rgba(255,255,255,0.15); }
+    .brand-tagline { margin-top: 16px; }
+    .brand-tagline h2 { font-size: 16px; }
+    .brand-tagline p { font-size: 11px; }
+    .brand-dots { margin-top: 16px; gap: 8px; }
+    .brand-dots span { width: 8px; height: 8px; }
+    .form-panel { padding: 20px 16px; }
+    .form-inner { max-width: 100%; }
+    .form-header { margin-bottom: 20px; }
+    .form-header .welcome { font-size: 20px; }
+    .form-header .sub { font-size: 12px; }
+    .field { margin-bottom: 14px; }
+    .field label { font-size: 11px; margin-bottom: 6px; }
+    .input-wrap { }
+    .input-icon { left: 12px; }
+    .field input { font-size: 16px; padding: 10px 12px 10px 38px; border-radius: 10px; }
+    #login-btn { font-size: 13px; padding: 11px; border-radius: 10px; }
+    #login-btn svg { width: 14px; height: 14px; }
+    .form-footer { margin-top: 20px; font-size: 11px; line-height: 1.5; }
   }
 </style>
 </head>

@@ -775,6 +775,258 @@
   #toast.show { opacity: 1; transform: translateY(0); }
 
   #toast svg { color: var(--teal); flex-shrink: 0; }
+
+  /* ═══════════════════════════════════════════
+     RESPONSIVE DESIGN
+  ═══════════════════════════════════════════ */
+  @media (max-width: 1200px) {
+    #sidebar { width: 280px; min-width: 240px; }
+  }
+
+  @media (max-width: 992px) {
+    #sidebar { width: 260px; min-width: 220px; }
+    #chat-header { padding: 0 18px; height: 60px; }
+    #messages { padding: 18px; gap: 6px; }
+    .msg { max-width: 75%; font-size: 13px; padding: 9px 12px; }
+    #input-area { padding: 14px; gap: 8px; }
+    #msg-input { font-size: 13px; padding: 9px 12px; border-radius: 12px; }
+    #send-btn { padding: 8px 14px; font-size: 12px; }
+  }
+
+  @media (max-width: 768px) {
+    body { flex-direction: column; }
+    #sidebar { 
+      width: 100%; 
+      min-width: unset;
+      height: auto;
+      max-height: 60px;
+      flex-direction: row;
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+      padding: 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+      animation: none;
+    }
+    #sidebar-header {
+      padding: 8px 12px;
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
+      border: none;
+      background: transparent;
+      flex-shrink: 0;
+      min-width: auto;
+      width: auto;
+    }
+    .pending-badge { margin-left: auto; margin-right: 8px; }
+    #pending-list { 
+      display: flex;
+      flex-direction: row;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 0;
+      gap: 4px;
+      margin: 0 12px;
+      flex: 1;
+      min-width: 0;
+    }
+    .sidebar-section-label { display: none; }
+    #main { 
+      flex: 1;
+      overflow: hidden;
+    }
+    #chat-header { 
+      height: 56px;
+      padding: 0 14px;
+      gap: 10px;
+    }
+    .header-avatar { width: 34px; height: 34px; }
+    .header-name { font-size: 13px; }
+    .header-meta { font-size: 11px; }
+    #resolve-btn {
+      font-size: 12px;
+      padding: 7px 14px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    #messages {
+      padding: 16px 12px;
+      gap: 6px;
+    }
+    .msg {
+      max-width: 85%;
+      font-size: 13px;
+      padding: 8px 11px;
+      border-radius: 12px;
+    }
+    .msg img {
+      max-width: 100%;
+    }
+    .msg .meta {
+      font-size: 10px;
+      margin-top: 4px;
+    }
+    #input-area {
+      padding: 12px;
+      gap: 8px;
+      flex-direction: column;
+    }
+    #msg-input {
+      font-size: 14px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      min-height: 40px;
+    }
+    #send-btn {
+      font-size: 12px;
+      padding: 8px 14px;
+      align-self: flex-end;
+    }
+    #toast {
+      bottom: 70px;
+      right: 12px;
+      left: 12px;
+      max-width: unset;
+      font-size: 12px;
+      padding: 12px 14px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    #sidebar {
+      max-height: 56px;
+    }
+    #sidebar-header {
+      padding: 6px 10px;
+      gap: 6px;
+    }
+    .agent-photo {
+      width: 36px;
+      height: 36px;
+      min-width: 36px;
+      min-height: 36px;
+    }
+    .agent-name { font-size: 12px; }
+    .agent-username { font-size: 10px; display: none; }
+    #logout-btn {
+      padding: 6px 10px;
+      font-size: 11px;
+    }
+    .pending-badge { font-size: 10px; padding: 2px 6px; }
+    #pending-list {
+      gap: 3px;
+      margin: 0 8px;
+    }
+    .pending-item {
+      padding: 8px 10px;
+      gap: 8px;
+      margin: 0;
+      font-size: 12px;
+      min-width: 80px;
+      white-space: nowrap;
+    }
+    .avatar {
+      width: 32px;
+      height: 32px;
+      min-width: 32px;
+      font-size: 12px;
+    }
+    .pending-info .name {
+      font-size: 11px;
+    }
+    .pending-info .type {
+      font-size: 10px;
+    }
+    #chat-header {
+      height: 52px;
+      padding: 0 10px;
+      gap: 8px;
+    }
+    .header-avatar { width: 32px; height: 32px; }
+    .header-name { font-size: 12px; }
+    .header-meta { font-size: 10px; }
+    #resolve-btn {
+      font-size: 11px;
+      padding: 6px 12px;
+    }
+    #empty-state {
+      gap: 10px;
+      padding: 20px;
+    }
+    .empty-illustration {
+      width: 80px;
+      height: 80px;
+    }
+    .empty-illustration svg { width: 36px; height: 36px; }
+    .empty-title {
+      font-size: 14px;
+    }
+    .empty-subtitle {
+      font-size: 12px;
+    }
+    #messages {
+      padding: 12px 10px;
+      gap: 4px;
+    }
+    .msg {
+      max-width: 90%;
+      font-size: 12px;
+      padding: 7px 10px;
+      border-radius: 10px;
+    }
+    .msg .meta {
+      font-size: 9px;
+      margin-top: 3px;
+    }
+    .msg img {
+      max-width: 100%;
+      border-radius: 8px;
+    }
+    #input-area {
+      padding: 10px;
+      gap: 6px;
+      flex-direction: column;
+    }
+    #msg-input {
+      font-size: 14px;
+      padding: 9px 10px;
+      border-radius: 10px;
+      min-height: 38px;
+      max-height: 80px;
+    }
+    #send-btn {
+      font-size: 11px;
+      padding: 7px 12px;
+      align-self: flex-end;
+    }
+    .send-spinner { width: 12px; height: 12px; border-width: 1.5px; }
+    #toast {
+      bottom: 66px;
+      right: 10px;
+      left: 10px;
+      font-size: 11px;
+      padding: 10px 12px;
+    }
+  }
+
+  @media (max-width: 360px) {
+    #sidebar-header { padding: 6px 8px; }
+    .agent-photo { width: 32px; height: 32px; }
+    .agent-name { font-size: 11px; }
+    #logout-btn { padding: 5px 8px; font-size: 10px; }
+    .pending-badge { font-size: 9px; padding: 1px 5px; }
+    .pending-item { padding: 6px 8px; font-size: 11px; }
+    .avatar { width: 28px; height: 28px; font-size: 11px; }
+    #chat-header { height: 50px; padding: 0 8px; }
+    .header-avatar { width: 28px; height: 28px; }
+    .header-name { font-size: 11px; }
+    #resolve-btn { font-size: 10px; padding: 5px 10px; }
+    #messages { padding: 10px 8px; }
+    .msg { font-size: 11px; padding: 6px 9px; }
+    #msg-input { font-size: 13px; padding: 8px 10px; }
+    #send-btn { font-size: 10px; padding: 6px 10px; }
+  }
 </style>
 </head>
 <body>
