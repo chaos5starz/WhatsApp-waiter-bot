@@ -796,59 +796,137 @@
   @media (max-width: 768px) {
     body { flex-direction: column; }
     #sidebar { 
-      width: 100%; 
-      min-width: unset;
-      height: auto;
-      max-height: 60px;
-      flex-direction: row;
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      max-height: 100%;
+      flex-direction: column;
+      z-index: 1000;
       border-right: none;
-      border-bottom: 1px solid var(--border);
+      border-bottom: none;
       padding: 0;
-      overflow-x: auto;
-      overflow-y: hidden;
-      animation: none;
+      overflow-y: auto;
+      background: linear-gradient(180deg, var(--teal), var(--teal-dark));
+      box-shadow: 0 12px 40px rgba(0,0,0,0.12);
     }
+    #sidebar.active { display: flex; }
     #sidebar-header {
-      padding: 8px 12px;
-      flex-direction: row;
-      align-items: center;
-      gap: 8px;
+      padding: 16px 16px;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
       border: none;
-      background: transparent;
+      background: rgba(255,255,255,0.14);
       flex-shrink: 0;
-      min-width: auto;
-      width: auto;
+      min-width: unset;
+      width: 100%;
     }
-    .pending-badge { margin-left: auto; margin-right: 8px; }
+    .pending-badge { margin-left: auto; margin-right: 0; align-self: flex-end; margin-top: -8px; }
     #pending-list { 
       display: flex;
-      flex-direction: row;
-      overflow-x: auto;
-      overflow-y: hidden;
-      padding: 0;
-      gap: 4px;
-      margin: 0 12px;
+      flex-direction: column;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 8px 8px;
+      gap: 8px;
+      margin: 0;
       flex: 1;
-      min-width: 0;
+      min-width: unset;
     }
-    .sidebar-section-label { display: none; }
+    .sidebar-section-label { 
+      display: block;
+      padding: 0 16px;
+      margin-top: 8px;
+    }
+    .pending-item {
+      padding: 14px 16px;
+      gap: 14px;
+      margin: 0;
+      font-size: 13px;
+      min-width: unset;
+      white-space: normal;
+      width: auto;
+    }
     #main { 
       flex: 1;
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    #mobile-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      background: rgba(255,255,255,0.95);
+      border-bottom: 1px solid var(--border);
+      height: 50px;
+      flex-shrink: 0;
+      gap: 8px;
+    }
+    #mobile-menu-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--navy);
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    #mobile-menu-btn:hover { background: rgba(0,0,0,0.05); border-radius: 6px; }
+    .mobile-user-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      min-width: 0;
+    }
+    .mobile-user-photo {
+      width: 36px;
+      height: 36px;
+      min-width: 36px;
+      border-radius: 50%;
+      overflow: hidden;
+      background: rgba(46,207,178,0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--navy);
+      border: 2px solid var(--teal);
+    }
+    .mobile-user-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--navy);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #mobile-pending-badge {
+      background: var(--teal);
+      color: var(--white);
+      font-size: 11px;
+      font-weight: 700;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      cursor: pointer;
+      min-width: 24px;
     }
     #chat-header { 
-      height: 56px;
-      padding: 0 14px;
-      gap: 10px;
-    }
-    .header-avatar { width: 34px; height: 34px; }
-    .header-name { font-size: 13px; }
-    .header-meta { font-size: 11px; }
-    #resolve-btn {
-      font-size: 12px;
-      padding: 7px 14px;
-      white-space: nowrap;
-      flex-shrink: 0;
+      display: none;
     }
     #messages {
       padding: 16px 12px;
@@ -894,37 +972,45 @@
   }
 
   @media (max-width: 480px) {
-    #sidebar {
-      max-height: 56px;
-    }
-    #sidebar-header {
-      padding: 6px 10px;
+    #mobile-header {
+      height: 48px;
+      padding: 10px 12px;
       gap: 6px;
     }
-    .agent-photo {
-      width: 36px;
-      height: 36px;
-      min-width: 36px;
-      min-height: 36px;
+    #mobile-menu-btn {
+      padding: 4px;
+      font-size: 18px;
     }
-    .agent-name { font-size: 12px; }
-    .agent-username { font-size: 10px; display: none; }
-    #logout-btn {
-      padding: 6px 10px;
-      font-size: 11px;
+    .mobile-user-info {
+      gap: 8px;
     }
-    .pending-badge { font-size: 10px; padding: 2px 6px; }
+    .mobile-user-photo {
+      width: 32px;
+      height: 32px;
+      min-width: 32px;
+      font-size: 13px;
+    }
+    .mobile-user-name {
+      font-size: 12px;
+    }
+    #mobile-pending-badge {
+      width: 22px;
+      height: 22px;
+      font-size: 10px;
+    }
+    #sidebar {
+      padding-top: 0;
+    }
+    #sidebar-header {
+      padding: 14px 14px;
+    }
     #pending-list {
-      gap: 3px;
-      margin: 0 8px;
+      padding: 6px 6px;
+      gap: 6px;
     }
     .pending-item {
-      padding: 8px 10px;
-      gap: 8px;
-      margin: 0;
-      font-size: 12px;
-      min-width: 80px;
-      white-space: nowrap;
+      padding: 12px 14px;
+      gap: 12px;
     }
     .avatar {
       width: 32px;
@@ -937,33 +1023,6 @@
     }
     .pending-info .type {
       font-size: 10px;
-    }
-    #chat-header {
-      height: 52px;
-      padding: 0 10px;
-      gap: 8px;
-    }
-    .header-avatar { width: 32px; height: 32px; }
-    .header-name { font-size: 12px; }
-    .header-meta { font-size: 10px; }
-    #resolve-btn {
-      font-size: 11px;
-      padding: 6px 12px;
-    }
-    #empty-state {
-      gap: 10px;
-      padding: 20px;
-    }
-    .empty-illustration {
-      width: 80px;
-      height: 80px;
-    }
-    .empty-illustration svg { width: 36px; height: 36px; }
-    .empty-title {
-      font-size: 14px;
-    }
-    .empty-subtitle {
-      font-size: 12px;
     }
     #messages {
       padding: 12px 10px;
@@ -1049,6 +1108,16 @@
     <div id="pending-list"></div>
   </div>
 
+  <!-- ═══════ MOBILE HEADER ═══════ -->
+  <div id="mobile-header" style="display: none;">
+    <button id="mobile-menu-btn" type="button">☰</button>
+    <div class="mobile-user-info">
+      <div class="mobile-user-photo" id="mobile-user-photo">?</div>
+      <div class="mobile-user-name" id="mobile-user-name">User</div>
+    </div>
+    <div id="mobile-pending-badge">0</div>
+  </div>
+
   <!-- ═══════ MAIN ═══════ -->
   <div id="main">
     <div id="empty-state">
@@ -1078,6 +1147,47 @@
 let currentChatId = null;
 const renderedMessageIds = new Set();
 const socket = io();
+
+// ── Mobile Header Setup ────────────────────────────────────
+
+function setupMobileHeader() {
+  const isMobile = window.innerWidth <= 768;
+  const mobileHeader = document.getElementById('mobile-header');
+  const desktop = document.getElementById('sidebar');
+  
+  if (isMobile) {
+    mobileHeader.style.display = 'flex';
+    desktop.style.display = 'none';
+  } else {
+    mobileHeader.style.display = 'none';
+    desktop.style.display = 'flex';
+  }
+}
+
+function toggleMobileMenu() {
+  const sidebar = document.getElementById('sidebar');
+  sidebar.classList.toggle('active');
+}
+
+function closeMobileMenu() {
+  const sidebar = document.getElementById('sidebar');
+  if (window.innerWidth <= 768) {
+    sidebar.classList.remove('active');
+  }
+}
+
+window.addEventListener('resize', setupMobileHeader);
+document.getElementById('mobile-menu-btn')?.addEventListener('click', toggleMobileMenu);
+document.getElementById('mobile-pending-badge')?.addEventListener('click', toggleMobileMenu);
+document.addEventListener('click', (e) => {
+  const sidebar = document.getElementById('sidebar');
+  const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+  const mobileBadge = document.getElementById('mobile-pending-badge');
+  if (window.innerWidth <= 768 && sidebar.classList.contains('active') && 
+      !sidebar.contains(e.target) && e.target !== mobileMenuBtn && e.target !== mobileBadge) {
+    closeMobileMenu();
+  }
+});
 
 // ── Helpers ────────────────────────────────────────────────
 
@@ -1113,6 +1223,7 @@ function showToast(msg) {
 async function checkAuthAndLoad() {
   const res = await fetch('/api/pending');
   if (res.status === 401) { window.location.href = '/login.html'; return; }
+  setupMobileHeader();
   await loadAgentProfile();
   attachLogoutHandler();
   loadPending();
@@ -1160,6 +1271,18 @@ async function loadAgentProfile() {
       photoEl.appendChild(initialsEl);
     }
   }
+  
+  // Update mobile header
+  const mobileUserName = document.getElementById('mobile-user-name');
+  const mobileUserPhoto = document.getElementById('mobile-user-photo');
+  if (mobileUserName) mobileUserName.textContent = me.username || 'User';
+  if (mobileUserPhoto) {
+    if (me.avatar) {
+      mobileUserPhoto.innerHTML = `<img src="${escapeHtml(me.avatar)}" alt="${escapeHtml(me.username)}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" />`;
+    } else {
+      mobileUserPhoto.textContent = initials(me.username);
+    }
+  }
 }
 
 async function loadPending() {
@@ -1168,8 +1291,10 @@ async function loadPending() {
   const list = document.getElementById('pending-list');
 
   const badge = document.getElementById('pending-count');
+  const mobileBadge = document.getElementById('mobile-pending-badge');
   const prev = parseInt(badge.textContent, 10) || 0;
   badge.textContent = pending.length;
+  if (mobileBadge) mobileBadge.textContent = pending.length;
   if (pending.length !== prev) {
     badge.classList.remove('bump');
     void badge.offsetWidth;
@@ -1190,7 +1315,7 @@ async function loadPending() {
       </div>
       <div class="live-dot"></div>
     `;
-    div.onclick = () => openChat(p.chatId, p.data);
+    div.onclick = () => { openChat(p.chatId, p.data); closeMobileMenu(); };
     list.appendChild(div);
   });
 }
