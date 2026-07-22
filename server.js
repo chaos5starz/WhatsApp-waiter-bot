@@ -110,17 +110,17 @@ function startDashboard({ sock, sessions, saveSessions, notifyClaimed, registerP
       return res.status(429).json({ error: `Too many failed attempts. Try again in about ${minutes} minute(s).` });
     }
 
-    const { username, password } = req.body;
-    const match = RESPONDERS.find((r) => r.username === username && r.password === password);
+    const { email, password } = req.body;
+    const match = RESPONDERS.find((r) => r.email === email && r.password === password);
     if (match) {
       clearLoginAttempts(key);
       req.session.loggedIn = true;
-      req.session.username = username;
+      req.session.username = match.username;
       return res.json({ ok: true });
     }
 
     recordFailedLogin(key);
-    return res.status(401).json({ error: 'Invalid credentials' });
+    return res.status(401).json({ error: 'Invalid email or password' });
   });
 
   app.post('/api/logout', (req, res) => {

@@ -498,16 +498,16 @@
       <div id="error" role="alert"></div>
 
       <div class="field">
-        <label for="username">Username</label>
+        <label for="email">Email</label>
         <div class="input-wrap">
           <span class="input-icon">
-            <!-- Person icon -->
+            <!-- Email icon -->
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-              <circle cx="12" cy="7" r="4"/>
+              <rect x="2" y="4" width="20" height="16" rx="2"/>
+              <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
             </svg>
           </span>
-          <input type="text" id="username" placeholder="Enter your username" autocomplete="username" />
+          <input type="email" id="email" placeholder="Enter your email address" autocomplete="email" />
         </div>
       </div>
 
@@ -544,11 +544,11 @@
   </div>
 
 <script>
-document.getElementById('username').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
+document.getElementById('email').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
 document.getElementById('password').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
 
 async function login() {
-  const username  = document.getElementById('username').value.trim();
+  const email     = document.getElementById('email').value.trim();
   const password  = document.getElementById('password').value;
   const btn       = document.getElementById('login-btn');
   const errorEl   = document.getElementById('error');
@@ -557,10 +557,10 @@ async function login() {
   // Clear errors
   errorEl.innerHTML = '';
   errorEl.classList.remove('shake');
-  document.getElementById('username').classList.remove('error-field');
+  document.getElementById('email').classList.remove('error-field');
   document.getElementById('password').classList.remove('error-field');
 
-  if (!username || !password) {
+  if (!email || !password) {
     showError('Please fill in all fields.');
     return;
   }
@@ -573,7 +573,7 @@ async function login() {
     const res = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ email, password }),
     });
 
     if (res.ok) {
@@ -581,8 +581,8 @@ async function login() {
       window.location.href = '/dashboard.html';
     } else {
       const body = await res.json().catch(() => ({}));
-      showError(body.error || 'Invalid username or password.');
-      document.getElementById('username').classList.add('error-field');
+      showError(body.error || 'Invalid email or password.');
+      document.getElementById('email').classList.add('error-field');
       document.getElementById('password').classList.add('error-field');
       document.getElementById('password').value = '';
       document.getElementById('password').focus();
@@ -592,7 +592,7 @@ async function login() {
     btn.classList.remove('loading');
     if (dots) dots.classList.remove('loading');
   }
-}
+
 
 function showError(msg) {
   const errorEl = document.getElementById('error');
