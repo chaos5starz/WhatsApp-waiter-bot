@@ -1166,28 +1166,54 @@ function setupMobileHeader() {
 
 function toggleMobileMenu() {
   const sidebar = document.getElementById('sidebar');
-  sidebar.classList.toggle('active');
+  const isActive = !sidebar.classList.contains('active');
+  
+  if (isActive) {
+    sidebar.classList.add('active');
+    sidebar.style.display = 'flex'; // Override inline style from setupMobileHeader
+  } else {
+    sidebar.classList.remove('active');
+    sidebar.style.display = 'none';
+  }
+  console.log('Toggle clicked, sidebar active:', sidebar.classList.contains('active'));
 }
 
 function closeMobileMenu() {
   const sidebar = document.getElementById('sidebar');
   if (window.innerWidth <= 768) {
     sidebar.classList.remove('active');
+    sidebar.style.display = 'none';
   }
 }
 
-window.addEventListener('resize', setupMobileHeader);
-document.getElementById('mobile-menu-btn')?.addEventListener('click', toggleMobileMenu);
-document.getElementById('mobile-pending-badge')?.addEventListener('click', toggleMobileMenu);
-document.addEventListener('click', (e) => {
-  const sidebar = document.getElementById('sidebar');
+function setupMobileEventListeners() {
   const mobileMenuBtn = document.getElementById('mobile-menu-btn');
-  const mobileBadge = document.getElementById('mobile-pending-badge');
-  if (window.innerWidth <= 768 && sidebar.classList.contains('active') && 
-      !sidebar.contains(e.target) && e.target !== mobileMenuBtn && e.target !== mobileBadge) {
-    closeMobileMenu();
+  const mobilePendingBadge = document.getElementById('mobile-pending-badge');
+  const sidebar = document.getElementById('sidebar');
+  
+  if (mobileMenuBtn) {
+    mobileMenuBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleMobileMenu();
+    });
   }
-});
+  
+  if (mobilePendingBadge) {
+    mobilePendingBadge.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleMobileMenu();
+    });
+  }
+  
+  document.addEventListener('click', (e) => {
+    if (window.innerWidth <= 768 && sidebar && sidebar.classList.contains('active') && 
+        !sidebar.contains(e.target) && e.target !== mobileMenuBtn && e.target !== mobilePendingBadge) {
+      closeMobileMenu();
+    }
+  });
+  
+  window.addEventListener('resize', setupMobileHeader);
+}
 
 // ── Helpers ────────────────────────────────────────────────
 
@@ -1224,6 +1250,7 @@ async function checkAuthAndLoad() {
   const res = await fetch('/api/pending');
   if (res.status === 401) { window.location.href = '/login.html'; return; }
   setupMobileHeader();
+  setupMobileEventListeners();
   await loadAgentProfile();
   attachLogoutHandler();
   loadPending();
@@ -1524,8 +1551,15 @@ socket.on('pending_updated', loadPending);
 
 // ── Init ───────────────────────────────────────────────────
 
-checkAuthAndLoad();
-setInterval(loadPending, 15000);
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    checkAuthAndLoad();
+    setInterval(loadPending, 15000);
+  });
+} else {
+  checkAuthAndLoad();
+  setInterval(loadPending, 15000);
+}
 
 </script>
 </body>
