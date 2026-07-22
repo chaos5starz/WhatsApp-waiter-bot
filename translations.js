@@ -38,8 +38,8 @@ module.exports = {
     ar: `شكرًا لك! ✅ تم استلام طلبك - سيتواصل معك أحد أعضاء فريقنا قريبًا.`,
   },
   confirmRestart: {
-    en: `No problem, let's start over. What's your name?`,
-    ar: `لا مشكلة، لنبدأ من جديد. ما اسمك؟`,
+    en: `No problem, {name}! Let's start over — how can we help you today?`,
+    ar: `لا مشكلة، {name}! لنبدأ من جديد - كيف يمكننا مساعدتك اليوم؟`,
   },
   nameLabel: {
     en: `Name`,
@@ -142,4 +142,11 @@ module.exports = {
 
   askOtherDescription: { en: `Please describe what you need help with.`, ar: `يرجى وصف ما تحتاج المساعدة فيه.` },
   otherDescriptionLabel: { en: `Details`, ar: `التفاصيل` },
+
+  // ---- Flight booking (combined single-question version) ----
+  askFlightDetailsAll: {
+    en: `Please send me the following in one message:\n1️⃣ Origin & destination (e.g. Cairo to Dubai)\n2️⃣ Preferred travel date\n3️⃣ Number of passengers`,
+    ar: `يرجى إرسال التالي في رسالة واحدة:\n1️⃣ نقطة الانطلاق والوجهة (مثال: القاهرة إلى دبي)\n2️⃣ تاريخ السفر المفضل\n3️⃣ عدد المسافرين`,
+  },
+  tripDetailsLabel: { en: `Trip details`, ar: `تفاصيل الرحلة` },
 };

@@ -25,14 +25,16 @@ const { startDashboard } = require('./server');
 const translations = require('./translations');
 const flows = require('./flows');
 
-const RESET_AFTER_HOURS = 1;
+const RESET_AFTER_HOURS = 24;
 const COMPANY_NAME = 'Alforkan Tours';
 const DASHBOARD_PORT = 3000;
 const AUTH_FOLDER = './baileys_auth'; // replaces .wwebjs_auth - just JSON files now, no browser profile
+const MAX_RECONNECT_DELAY_MS = 60000; // cap backoff at 1 minute between reconnect attempts
 
 let sessions = loadSessions();
 let io = null; // set once the dashboard starts, used to push live updates
 let sock = null; // current Baileys socket - reassigned on every reconnect
+let reconnectAttempts = 0; // reset to 0 whenever connection === 'open'
 
 // Tracks WhatsApp message text that WE (the bot, OR the dashboard on behalf
 // of a human agent) just sent, so the message handler can tell "we already
@@ -49,6 +51,25 @@ const BOOT_TIMESTAMP = Math.floor(Date.now() / 1000);
 
 function now() {
   return Date.now();
+}
+
+// Converts Arabic-Indic (٠-٩) and Eastern Arabic-Indic (۰-۹) digits to
+// Western 0-9, so numeric menu replies work regardless of which digit
+// style the customer's keyboard sends - WhatsApp delivers whatever
+// characters the client typed, and parseInt() only understands Western
+// digits. Only applied where we parse a numeric menu choice (ASK_LANGUAGE,
+// SELECT_CATEGORY) - never applied to free-text field answers, since a
+// customer's dates/names/etc. should be stored exactly as they typed them.
+function normalizeDigits(str) {
+  const arabicIndic = '٠١٢٣٤٥٦٧٨٩';
+  const easternArabicIndic = '۰۱۲۳۴۵۶۷۸۹';
+  return str.replace(/[٠-٩۰-۹]/g, (d) => {
+    let idx = arabicIndic.indexOf(d);
+    if (idx !== -1) return String(idx);
+    idx = easternArabicIndic.indexOf(d);
+    if (idx !== -1) return String(idx);
+    return d;
+  });
 }
 
 function t(key, lang, vars) {
@@ -182,8 +203,8 @@ async function sweepStaleSessions() {
   }
 }
 
-// ---- Unchanged from the whatsapp-web.js version: pure state-machine logic,
-// no WhatsApp-library calls except botSend(), which is transport-agnostic. ----
+// ---- Pure state-machine logic, no WhatsApp-library calls except
+// botSend(), which is transport-agnostic. ----
 async function handleCustomerMessage(chatId, text) {
   const session = getSession(chatId);
 
@@ -204,7 +225,7 @@ async function handleCustomerMessage(chatId, text) {
     }
 
     case 'ASK_LANGUAGE': {
-      const reply = text.trim();
+      const reply = normalizeDigits(text.trim());
       let chosen = null;
       if (reply === '1' || /english/i.test(reply)) chosen = 'en';
       else if (reply === '2' || /عرب/.test(reply)) chosen = 'ar';
@@ -244,7 +265,7 @@ async function handleCustomerMessage(chatId, text) {
         break;
       }
 
-      const idx = parseInt(text.trim(), 10) - 1;
+      const idx = parseInt(normalizeDigits(text.trim()), 10) - 1;
       if (Number.isNaN(idx) || idx < 0 || idx >= options.length) {
         await botSend(chatId, `${t('invalidChoice', lang)}\n\n${renderMenu(options, lang)}`);
         break;
@@ -342,14 +363,21 @@ async function handleCustomerMessage(chatId, text) {
         await notifyNewRequest(sessions[chatId].data);
         if (io) io.emit('pending_updated');
       } else if (isNo) {
+        // Keep name + language, only reset the category selection - drops
+        // the customer straight back at the top-level menu instead of
+        // re-asking their name (which we already have).
+        const keptName = sessions[chatId].data.name;
         sessions[chatId] = {
-          state: 'ASK_NAME',
-          data: { language: lang },
+          state: 'SELECT_CATEGORY',
+          data: { language: lang, name: keptName, categoryPath: [] },
           lastActivity: now(),
           claimedNotified: false,
         };
         saveSessions(sessions);
-        await botSend(chatId, t('confirmRestart', lang));
+        await botSend(
+          chatId,
+          `${t('confirmRestart', lang, { name: keptName })}\n\n${renderMenu(flows.categories, lang)}`
+        );
       } else {
         await botSend(chatId, t('confirmPrompt', lang));
       }
@@ -520,6 +548,7 @@ async function connectToWhatsApp() {
 
     if (connection === 'open') {
       clearTimeout(startupStallWarning);
+      reconnectAttempts = 0; // fresh backoff sequence next time we disconnect
       console.log('WhatsApp bot is ready and connected.');
       if (!io) {
         io = startDashboard({
@@ -545,8 +574,18 @@ async function connectToWhatsApp() {
           '\n❌ Logged out from WhatsApp. Delete the baileys_auth folder and restart to link again.\n'
         );
       } else {
-        console.log('Reconnecting...');
-        connectToWhatsApp();
+        // Exponential backoff instead of an instant retry - a genuine
+        // outage (no internet, DNS failure, etc.) previously caused a
+        // tight reconnect loop firing multiple times per second, which
+        // wastes resources and risks looking automated/abusive to
+        // WhatsApp once the connection actually comes back. Starts fast
+        // (1s) in case it's just a momentary blip, then backs off up to
+        // MAX_RECONNECT_DELAY_MS for a longer outage. Resets to 0 the
+        // moment 'open' fires again above.
+        reconnectAttempts += 1;
+        const delayMs = Math.min(1000 * 2 ** (reconnectAttempts - 1), MAX_RECONNECT_DELAY_MS);
+        console.log(`Reconnecting in ${Math.round(delayMs / 1000)}s (attempt ${reconnectAttempts})...`);
+        setTimeout(connectToWhatsApp, delayMs);
       }
     }
   });

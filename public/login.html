@@ -159,10 +159,14 @@
     align-items: center;
   }
 
+  /* Dots are static by default; animate only when `.loading` is present. */
   .brand-dots span {
     display: block;
     border-radius: 50%;
     background: rgba(255,255,255,0.35);
+  }
+
+  .brand-dots.loading span {
     animation: dotWave 1.6s ease-in-out infinite;
   }
 
@@ -508,6 +512,7 @@ async function login() {
   const password  = document.getElementById('password').value;
   const btn       = document.getElementById('login-btn');
   const errorEl   = document.getElementById('error');
+  const dots      = document.querySelector('.brand-dots');
 
   // Clear errors
   errorEl.innerHTML = '';
@@ -522,6 +527,7 @@ async function login() {
 
   btn.disabled = true;
   btn.classList.add('loading');
+  if (dots) dots.classList.add('loading');
 
   try {
     const res = await fetch('/api/login', {
@@ -544,6 +550,7 @@ async function login() {
   } finally {
     btn.disabled = false;
     btn.classList.remove('loading');
+    if (dots) dots.classList.remove('loading');
   }
 }
 

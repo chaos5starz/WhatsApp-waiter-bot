@@ -13,10 +13,13 @@ module.exports = {
     {
       id: 'flight_booking',
       label: 'flightBookingLabel',
+      // Collapsed from 3 separate questions (route, travel date,
+      // passengers) into 1 combined question - the multi-step flow was
+      // feeling long/repetitive for a category this simple. Still a
+      // single generic field under the hood, so no index.js changes
+      // needed - COLLECT_FIELD just sees a fields array of length 1.
       fields: [
-        { key: 'route', prompt: 'askRoute', label: 'routeLabel' },
-        { key: 'travelDate', prompt: 'askTravelDate', label: 'travelDateLabel' },
-        { key: 'passengers', prompt: 'askPassengers', label: 'passengersLabel' },
+        { key: 'tripDetails', prompt: 'askFlightDetailsAll', label: 'tripDetailsLabel' },
       ],
     },
     {

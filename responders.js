@@ -20,6 +20,8 @@ while (process.env[`RESPONDER_${n}_USERNAME`]) {
     username: process.env[`RESPONDER_${n}_USERNAME`],
     password: process.env[`RESPONDER_${n}_PASSWORD`],
     email: process.env[`RESPONDER_${n}_EMAIL`] || null,
+    displayName: process.env[`RESPONDER_${n}_DISPLAY_NAME`] || process.env[`RESPONDER_${n}_USERNAME`],
+    avatar: process.env[`RESPONDER_${n}_AVATAR`] || null,
   });
   n += 1;
 }
